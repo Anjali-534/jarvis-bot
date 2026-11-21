@@ -27,6 +27,10 @@ _DANGLING = re.compile(r"\b(?:of|in|for|on|to|at|about|from|with|into|called|nam
                        r"launch|close|status|work on)$")
 
 
+# If a leading "jarvis" is followed by one of these, it's the subject ("जार्विस का गिट स्टेटस", "jarvis project ...").
+_SUBJECT_NEXT = re.compile(r"^(?:का|की|के|को|में|मे|से|पर|प्रोजेक्ट|project|folder|repo)(?:\s|$)")
+
+
 def strip_wake_word(text, wake_words=None):
     """Return (woke, command). The wake word is stripped from the start, end or middle."""
     words = wake_words or _wake_words()
@@ -36,9 +40,12 @@ def strip_wake_word(text, wake_words=None):
         return True, "exit"
     for word in words:
         w = re.escape(word)
-        lead = re.fullmatch(rf"{w}\b[\s,.!?]*(.*)", t)
+        lead = re.fullmatch(rf"{w}(?!\w)[\s,.!?]*(.*)", t)
         if lead:
-            return True, lead.group(1).strip()
+            rest = lead.group(1).strip()
+            if _SUBJECT_NEXT.match(rest):
+                return True, t  # the name is the project, not the wake word
+            return True, rest
         trail = re.fullmatch(rf"(.*?)[\s,]*\b{w}[\s.!?]*", t)
         if trail:
             before = trail.group(1).strip()

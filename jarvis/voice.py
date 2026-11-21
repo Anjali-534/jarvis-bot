@@ -5,6 +5,13 @@ import threading
 import config
 
 
+def speakable(text):
+    """Windows voices can't read Devanagari, so speak it in Roman letters ("मैं लेट हूँ" -> "main let hun")."""
+    from jarvis import translit
+
+    return translit.to_roman(text) if translit.has_devanagari(text) else text
+
+
 class Voice:
     def __init__(self, text_mode=False, mute=False):
         self.text_mode = text_mode
@@ -77,7 +84,7 @@ class Voice:
         if not self._tts_ok:
             return
         done = threading.Event()
-        self._queue.put((text, done))
+        self._queue.put((speakable(text), done))
         if wait:
             done.wait(timeout=120)
 

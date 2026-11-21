@@ -24,6 +24,7 @@ FALLBACK_PLACES = {"new delhi": Place("New Delhi", 28.6139, 77.2090), "delhi": P
 _CACHE: dict[str, Place | None] = {}
 
 PINCODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
+_DEVANAGARI = re.compile(r"[ऀ-ॿ]")
 
 # Words that mean "wherever I am" rather than a real place name
 _VAGUE = {
@@ -70,7 +71,7 @@ def location_from_command(command):
 
 
 def _nominatim(query):
-    params = {"format": "jsonv2", "limit": 1, "addressdetails": 0}
+    params = {"format": "jsonv2", "limit": 1, "addressdetails": 0, "accept-language": "en"}
     pin = find_pincode(query)
     if pin and len(query.replace(" ", "")) <= 8:
         params.update(postalcode=pin, country="India")
@@ -80,9 +81,11 @@ def _nominatim(query):
     if not results:
         return None
     first = results[0]
+    parts = [p.strip() for p in first.get("display_name", "").split(",") if p.strip() and not p.strip().isdigit()]
     if pin:
-        parts = [p.strip() for p in first.get("display_name", "").split(",") if p.strip() and not p.strip().isdigit()]
         name = parts[0] if parts else f"pincode {pin}"
+    elif _DEVANAGARI.search(query):
+        name = parts[0] if parts else query  # "दिल्ली" -> "Delhi", so the voice can say it
     else:
         name = query.title()
     return Place(name, float(first["lat"]), float(first["lon"]))
@@ -97,7 +100,8 @@ def _open_meteo(query):
     if not results:
         return None
     first = results[0]
-    return Place(query.title() if not query.isdigit() else first.get("name", query), first["latitude"], first["longitude"])
+    use_result_name = query.isdigit() or _DEVANAGARI.search(query)
+    return Place(first.get("name", query) if use_result_name else query.title(), first["latitude"], first["longitude"])
 
 
 def geocode(query):

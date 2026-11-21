@@ -63,7 +63,18 @@ YES_WORDS = {
 }
 
 
+HINDI_YES = {"हां", "हा", "जी", "जी हां", "हां जी", "ठीक है", "बिल्कुल", "जरूर", "कर दो", "भेज दो", "हां भेज दो"}
+HINDI_NO = {"नहीं", "नही", "ना", "मत", "रहने दो", "मत करो", "मत भेजो", "नहीं करना"}
+
+
 def is_yes(answer: str) -> bool:
+    from jarvis import translit
+
+    if translit.has_devanagari(answer):  # Hindi mode: "हाँ" / "नहीं"
+        words = " ".join(translit.tokenize(translit.norm(answer)))
+        if any(re.search(rf"(?<!\S){translit.norm(w)}(?!\S)", words) for w in HINDI_NO):
+            return False
+        return any(re.search(rf"(?<!\S){translit.norm(w)}(?!\S)", words) for w in HINDI_YES)
     answer = re.sub(r"[^\w\s]", "", (answer or "").lower()).strip()
     if not answer or re.search(r"\b(?:no|nope|nah|don't|dont|cancel|stop|nahi|mat)\b", answer):
         return False
@@ -110,11 +121,7 @@ def _deliver(ctx, sk, result):
     return sk.name
 
 
-def handle(ctx, command):
-    """Route one command. Returns the name of the skill that handled it."""
-    command = re.sub(r"\s+", " ", (command or "").replace("﻿", "").strip().lower())
-    if not command:
-        return None
+def _try_skills(ctx, command):
     for sk in SKILLS:
         match = next((m for m in (p.search(command) for p in sk.patterns) if m), None)
         if match is None:
@@ -122,6 +129,27 @@ def handle(ctx, command):
         result = _run(ctx, sk, command, match)
         if result is not None:
             return _deliver(ctx, sk, result)
+    return None
+
+
+def handle(ctx, command):
+    """Route one command. Returns the name of the skill that handled it."""
+    from jarvis import translit
+
+    command = re.sub(r"\s+", " ", (command or "").replace("﻿", "").strip().lower())
+    if not command:
+        return None
+    if translit.has_devanagari(command):
+        # Hindi mode: try the English rewrite first; chat that isn't a command reaches the AI unchanged
+        rewritten = translit.normalize_command(command)
+        if rewritten != command:
+            print(f"(understood as: {rewritten})")
+            handled = _try_skills(ctx, rewritten)
+            if handled:
+                return handled
+    handled = _try_skills(ctx, command)
+    if handled:
+        return handled
     if FALLBACK is not None:
         result = _run(ctx, FALLBACK, command, None)
         return _deliver(ctx, FALLBACK, result or "")

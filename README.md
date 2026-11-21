@@ -129,7 +129,7 @@ Reminders only fire while Jarvis is running.
 - "Who is Sachin Tendulkar", "tell me about the Taj Mahal", "what is Python" (Wikipedia)
 - Anything else goes to the AI (needs `AI_API_KEY`). "Forget our conversation" clears its memory.
 - Speak Hindi or Hinglish to the AI and it replies in Hinglish written in Roman letters, which the Windows voice can read.
-- "Switch to Hindi" makes speech recognition listen for Hindi (`hi-IN`), and "switch to English" switches back. This lasts for the session only. In Hindi mode, Google writes what you say in Devanagari, so the English command phrases won't match; it works best for chatting with the AI. For Hinglish commands, English mode usually works better.
+- "Switch to Hindi" makes speech recognition listen for Hindi (`hi-IN`), and "switch to English" switches back. This lasts for the session only. In Hindi mode Google writes what you say in Devanagari, and `jarvis/translit.py` rewrites commands into English before routing: "क्रोम खोलो" becomes "open chrome". Messages and notes keep your exact words, and anything that isn't a command goes to the AI unchanged. See the Hindi section of [COMMANDS.md](COMMANDS.md).
 
 ## Architecture
 
@@ -205,6 +205,6 @@ Some guidelines:
 - **VS Code:** recent projects, run tests by voice
 - **Spotify:** play playlists and liked songs through the Spotify API
 - **Calendar and email:** today's meetings, read and draft emails
-- **Hindi commands:** Devanagari patterns for the main skills, so commands also work in Hindi mode
+- **Hindi:** more phrase coverage in `translit.py`, and Hindi replies for the built-in skills (not just the AI)
 - Offline wake word (Porcupine / openWakeWord) and offline speech recognition
 - Reminders that persist across restarts

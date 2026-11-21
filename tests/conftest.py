@@ -10,8 +10,20 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import config  # noqa: E402
 import jarvis.skills  # noqa: E402,F401
-from jarvis import geo, http  # noqa: E402
+from jarvis import geo, http, router  # noqa: E402
 from jarvis.skills import vscode, whatsapp  # noqa: E402
+
+PURE_SKILLS = {"calculator"}  # real handlers that may return None to fall through
+
+
+@pytest.fixture
+def recorded_skills(monkeypatch):
+    """Replace every handler with one that just reports its name (routing tests)."""
+    for sk in router.SKILLS:
+        if sk.name not in PURE_SKILLS:
+            monkeypatch.setattr(sk, "handler", lambda ctx, cmd, m, name=sk.name: f"<{name}>")
+    monkeypatch.setattr(router.FALLBACK, "handler", lambda ctx, cmd, m: "<ai>")
+    monkeypatch.setattr(router.FALLBACK, "name", "ai")
 
 
 @pytest.fixture(autouse=True)

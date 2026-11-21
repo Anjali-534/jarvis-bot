@@ -68,18 +68,6 @@ ROUTES = [
     ("open vs code", "open"),
 ]
 
-PURE_SKILLS = {"calculator"}  # real handlers that may return None to fall through
-
-
-@pytest.fixture
-def recorded_skills(monkeypatch):
-    for sk in router.SKILLS:
-        if sk.name not in PURE_SKILLS:
-            monkeypatch.setattr(sk, "handler", lambda ctx, cmd, m, name=sk.name: f"<{name}>")
-    monkeypatch.setattr(router.FALLBACK, "handler", lambda ctx, cmd, m: "<ai>")
-    monkeypatch.setattr(router.FALLBACK, "name", "ai")
-
-
 @pytest.mark.parametrize("phrase, expected", ROUTES)
 def test_routing(recorded_skills, phrase, expected):
     assert handle(make_ctx(), phrase) == expected

@@ -94,3 +94,32 @@ Jarvis always reads the message back and asks before sending.
 - "Forget our conversation" (clears the AI's memory)
 - **Hindi / Hinglish:** talk to the AI in Hinglish and it replies in Hinglish, written in English letters so the voice can read it.
 - "Switch to Hindi" makes Jarvis listen for Hindi. "Switch to English" switches back. This lasts for the current session only.
+
+## Hindi commands (after "switch to Hindi")
+In Hindi mode you can give commands in natural Hindi. Jarvis rewrites them into English and prints what it understood, for example `(understood as: open chrome)`. Messages, notes and reminder texts are kept exactly as you said them. Anything that isn't a command goes to the AI unchanged, so you can chat in Hindi too.
+
+| Say | Jarvis does |
+|---|---|
+| "जार्विस, क्रोम खोलो" / "क्रोम और नोटपैड खोल दो" | open Chrome / open Chrome and Notepad |
+| "क्रोम बंद करो" | close Chrome |
+| "अरिजीत सिंह के गाने बजाओ" | play on YouTube |
+| "यूट्यूब पर लोफी म्यूज़िक सर्च करो" / "गूगल पर बेस्ट लैपटॉप सर्च करो" | search YouTube / Google |
+| "आवाज़ बढ़ाओ" / "आवाज़ कम करो" / "म्यूट करो" | volume up / down / mute |
+| "अगला गाना" / "गाना रोको" | next song / pause |
+| "अभी क्या टाइम है" / "आज की तारीख क्या है" | time / date |
+| "दिल्ली का मौसम कैसा है" / "कल बारिश होगी क्या" | weather / rain |
+| "रोहिणी में एक्यूआई क्या है" / "प्रदूषण कितना है" / "पीएम 2.5 कितना है" | AQI / PM2.5 |
+| "क्या बाहर जाना सुरक्षित है" / "मास्क चाहिए" | is it safe to go out / do I need a mask |
+| "10 मिनट में पानी पीने के लिए याद दिलाना" | remind me in 10 minutes |
+| "शाम 6 बजे मम्मी को कॉल करने के लिए याद दिलाना" | remind me at 6 pm |
+| "नोट करो कि दूध लाना है" / "मेरे नोट्स पढ़ो" | take a note / read notes |
+| "माँ को व्हाट्सएप पर मैसेज भेजो कि मैं लेट हूँ" | WhatsApp Mom "मैं लेट हूँ" (asks first) |
+| "माँ को व्हाट्सएप पर कॉल करो" | open Mom's chat to call |
+| "स्क्रीनशॉट लो" / "बैटरी कितनी है" / "लैपटॉप लॉक करो" | screenshot / battery / lock |
+| "लैपटॉप बंद करो" | shut down (asks first) |
+| "जार्विस प्रोजेक्ट वीएस कोड में खोलो" / "जार्विस का गिट स्टेटस बताओ" | open in VS Code / git status |
+| "मेरे प्रोजेक्ट्स दिखाओ" | list my projects |
+| "क्रिकेट की खबरें सुनाओ" / "एक चुटकुला सुनाओ" | news / joke |
+| "मदद" / "सो जाओ" / "अलविदा" | help / sleep / goodbye |
+| "हाँ" / "नहीं" | yes / no when Jarvis asks to confirm |
+| "स्विच टू इंग्लिश" | back to English |
