@@ -19,7 +19,8 @@ class Skill:
     name: str
     patterns: list
     handler: Callable
-    help: str = ""
+    examples: list = field(default_factory=list)  # example phrases for help and COMMANDS.md
+    category: str | None = None                   # a key of jarvis.skills.general.CATEGORIES
 
 
 SKILLS: list[Skill] = []
@@ -30,14 +31,23 @@ class SpokenError(Exception):
     """Raise from a skill to stop it and speak a friendly message."""
 
 
-def skill(name, *patterns, help=""):
-    """Register a skill triggered by any of the regex patterns (case-insensitive)."""
+def skill(name, *patterns, help=(), category=None):
+    """Register a skill triggered by any of the regex patterns (case-insensitive).
+
+    help: an example phrase, or a list of them, shown by "help" / "help with <category>".
+    category: which help category the skill belongs to.
+    """
+    examples = [help] if isinstance(help, str) and help else list(help)
 
     def decorator(fn):
-        SKILLS.append(Skill(name, [re.compile(p, re.IGNORECASE) for p in patterns], fn, help))
+        SKILLS.append(Skill(name, [re.compile(p, re.IGNORECASE) for p in patterns], fn, examples, category))
         return fn
 
     return decorator
+
+
+def skills_in(category):
+    return [s for s in SKILLS if s.category == category]
 
 
 def fallback(fn):

@@ -46,7 +46,7 @@ def rain_verdict(chance):
 
 
 @skill("rain", r"\bwill it rain\b", r"\bumbrella\b", r"\bis it (?:going to )?rain(?:ing)?\b", r"\b(?:rain|raining)\b.*\b(?:today|tomorrow)\b",
-       r"\bchance of rain\b")
+       r"\bchance of rain\b", category='time and weather', help=['will it rain tomorrow', 'do I need an umbrella'])
 def rain(ctx, command, match):
     place = geo.current_place(ctx, command)
     tomorrow = "tomorrow" in command
@@ -59,7 +59,7 @@ def rain(ctx, command, match):
 
 
 @skill("weather", r"\bweather\b", r"\btemperature\b", r"\bforecast\b", r"\bhow (?:hot|cold|humid) is it\b",
-       r"\bis it (?:hot|cold|humid)\b")
+       r"\bis it (?:hot|cold|humid)\b", category='time and weather', help=["what's the weather", 'weather in Mumbai tomorrow'])
 def weather(ctx, command, match):
     place = geo.current_place(ctx, command)
     data = forecast(place)

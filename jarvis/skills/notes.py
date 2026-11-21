@@ -29,7 +29,7 @@ def add_note(text):
         fh.write(f"{datetime.now():%Y-%m-%d %H:%M} | {text}\n")
 
 
-@skill("clear notes", r"\b(?:clear|delete|erase|remove|wipe)\b.*\bnotes?\b")
+@skill("clear notes", r"\b(?:clear|delete|erase|remove|wipe)\b.*\bnotes?\b", category='notes', help=['clear my notes'])
 def clear_notes(ctx, command, match):
     notes = read_notes()
     if not notes:
@@ -41,7 +41,7 @@ def clear_notes(ctx, command, match):
     return f"Done. I deleted {count}."
 
 
-@skill("read notes", r"\b(?:read|show|tell me|what are|list|open)\b.*\bnotes\b", r"\bmy notes\b", r"^notes$")
+@skill("read notes", r"\b(?:read|show|tell me|what are|list|open)\b.*\bnotes\b", r"\bmy notes\b", r"^notes$", category='notes', help=['read my notes'])
 def read_notes_skill(ctx, command, match):
     notes = read_notes()
     if not notes:
@@ -55,7 +55,7 @@ def read_notes_skill(ctx, command, match):
 
 
 @skill("take note", r"\b(?:take|make|write|add|create)\s+(?:a\s+|down\s+a\s+|this\s+)?note(?:\s+(?:that|saying|of))?\s*:?\s*(.*)$",
-       r"\bnote (?:down|this|that)\s*:?\s*(.*)$", r"^remember (?:that\s+)?(.+)$", r"\bremember that\s+(.+)$")
+       r"\bnote (?:down|this|that)\s*:?\s*(.*)$", r"^remember (?:that\s+)?(.+)$", r"\bremember that\s+(.+)$", category='notes', help=['take a note buy milk', 'remember that the meeting is at 5'])
 def take_note(ctx, command, match):
     text = match.group(1).strip(" .:")
     if not text:
@@ -114,7 +114,7 @@ def clean_message(text):
     return text.strip(" .,")
 
 
-@skill("cancel reminders", r"\b(?:cancel|delete|clear|stop|remove)\b.*\b(?:reminders?|timers?)\b")
+@skill("cancel reminders", r"\b(?:cancel|delete|clear|stop|remove)\b.*\b(?:reminders?|timers?)\b", category='notes', help=['cancel my reminders'])
 def cancel_reminders(ctx, command, match):
     active = _reminders(ctx)
     if not active:
@@ -128,7 +128,7 @@ def cancel_reminders(ctx, command, match):
     return f"Cancelled {len(cancelled)} {noun}{'s' if len(cancelled) != 1 else ''}."
 
 
-@skill("list reminders", r"\b(?:list|show|what are|read|tell me|any)\b.*\b(?:reminders|timers)\b", r"\bmy (?:reminders|timers)\b")
+@skill("list reminders", r"\b(?:list|show|what are|read|tell me|any)\b.*\b(?:reminders|timers)\b", r"\bmy (?:reminders|timers)\b", category='notes', help=['what are my reminders'])
 def list_reminders(ctx, command, match):
     active = sorted(_reminders(ctx), key=lambda e: e["when"])
     if not active:
@@ -139,7 +139,7 @@ def list_reminders(ctx, command, match):
     return f"You have {len(active)} active: " + "; ".join(items) + "."
 
 
-@skill("timer", r"\b(?:set|start)\s+(?:a\s+|an\s+)?timer\b(.*)$", r"\btimer for\b(.*)$", r"^(.+?)\s+timer$")
+@skill("timer", r"\b(?:set|start)\s+(?:a\s+|an\s+)?timer\b(.*)$", r"\btimer for\b(.*)$", r"^(.+?)\s+timer$", category='notes', help=['set a timer for 5 minutes'])
 def timer_skill(ctx, command, match):
     seconds = find_duration(match.group(1))
     if not seconds:
@@ -152,7 +152,7 @@ def timer_skill(ctx, command, match):
     return f"Timer set for {say_duration(seconds)}."
 
 
-@skill("reminder", r"\bremind me\b(.*)$", r"\bset (?:a\s+)?reminder\b(.*)$")
+@skill("reminder", r"\bremind me\b(.*)$", r"\bset (?:a\s+)?reminder\b(.*)$", category='notes', help=['remind me in 10 minutes to drink water', 'remind me at 6 pm to call mom'])
 def reminder_skill(ctx, command, match):
     seconds, rest, when = parse_when(match.group(1))
     if seconds is None:

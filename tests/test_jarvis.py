@@ -426,16 +426,119 @@ def test_ai_with_key_keeps_history(monkeypatch):
     assert ctx.state["ai_history"] == []
 
 
-def test_ai_rejected_key(monkeypatch):
-    monkeypatch.setattr(config, "AI_API_KEY", "sk-bad")
+@pytest.mark.parametrize("status, body, expected", [
+    (401, "Invalid API Key", "My AI key was rejected. Please check AI_API_KEY in your .env file."),
+    (400, '{"error": {"message": "API key not valid. Please pass a valid API key."}}', "My AI key was rejected"),
+    (403, "", "My AI key was rejected"),
+    (404, "model not found", "The AI model test-model wasn't found. Please check AI_MODEL and AI_BASE_URL"),
+    (429, "quota exceeded", "I've used up the free AI quota or hit the rate limit"),
+    (503, "", "The AI service is having problems"),
+    (400, "bad request", "The AI service returned an error, code 400."),
+])
+def test_ai_error_messages(monkeypatch, status, body, expected):
+    monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
+    monkeypatch.setattr(config, "AI_MODEL", "test-model")
 
     class Response:
-        status_code = 401
+        status_code = status
+        text = body
 
     monkeypatch.setattr(http, "post_json", lambda *a, **k: Response())
     ctx = make_ctx()
     handle(ctx, "tell me something interesting")
-    assert "rejected" in ctx.voice.last
+    assert ctx.voice.last.startswith(expected)
+    assert "sk-test" not in ctx.voice.last
+    assert ctx.state["ai_history"] == []  # failed turns are not remembered
+
+
+def test_ai_prompt_asks_for_roman_hinglish(monkeypatch):
+    monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
+    sent = []
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "Haan, bilkul!"}}]}
+
+    monkeypatch.setattr(http, "post_json", lambda url, payload, **k: sent.append(payload) or Response())
+    ctx = make_ctx()
+    handle(ctx, "kya tum hindi samajh sakte ho")
+    system_prompt = sent[0]["messages"][0]["content"]
+    assert "Hinglish" in system_prompt and "Roman" in system_prompt and "Devanagari" in system_prompt
+    assert ctx.voice.last == "Haan, bilkul!"
+
+
+# ---------------------------------------------------------------- help and language
+def test_short_help_prints_full_list(capsys):
+    ctx = make_ctx()
+    assert handle(ctx, "help") == "help"
+    assert ctx.voice.last == general.SHORT_HELP
+    printed = capsys.readouterr().out
+    for title in ("Air quality:", "WhatsApp:", "VS Code:", "Laptop controls:"):
+        assert title in printed
+    assert '"send a WhatsApp to mom saying I\'ll be late"' in printed
+
+
+def test_every_skill_has_category_and_examples():
+    for sk in router.SKILLS:
+        assert sk.category in general.CATEGORIES, sk.name
+        assert sk.examples, sk.name
+    for key in general.CATEGORIES:
+        assert 4 <= len(general.examples_for(key, limit=6, spoken=True)) <= 6, key
+
+
+def test_spoken_general_help_skips_housekeeping():
+    ctx = make_ctx()
+    handle(ctx, "help with general questions")
+    assert ctx.voice.last.startswith("For general questions, you can say: Switch to Hindi. What is 25 times 4.")
+    assert "Goodbye" not in ctx.voice.last
+
+
+@pytest.mark.parametrize("phrase, title", [
+    ("help with whatsapp", "WhatsApp"), ("help laptop", "laptop controls"),
+    ("what can you do with vs code", "VS Code"), ("help me with my notes", "notes and reminders"),
+    ("help with the air quality", "air quality"), ("help with whats app", "WhatsApp"),
+    ("help with vs cod", "VS Code"), ("commands for weather", "time and weather"), ("help with youtube", "web"),
+])
+def test_help_category(phrase, title):
+    ctx = make_ctx()
+    assert handle(ctx, phrase) == "help category"
+    reply = ctx.voice.last
+    assert reply.startswith(f"For {title}, you can say: ")
+    assert 4 <= reply.count(". ") + 1 <= 7
+
+
+def test_help_category_falls_through_to_ai(monkeypatch):
+    ctx = make_ctx()
+    assert handle(ctx, "help me write an email to my teacher") == "ai"
+    assert handle(ctx, "help me") == "help"
+
+
+def test_language_switch():
+    ctx = make_ctx()
+    ctx.voice.language = "en-IN"
+    assert handle(ctx, "switch to hindi") == "language"
+    assert ctx.voice.language == "hi-IN" and "switched to Hindi" in ctx.voice.last
+    assert handle(ctx, "switch to hindi") == "language"
+    assert ctx.voice.last == "I'm already listening in Hindi."
+    # in Hindi mode Google returns Devanagari text
+    assert handle(ctx, "स्विच टू इंग्लिश") == "language"
+    assert ctx.voice.language == "en-IN" and ctx.voice.last == "Okay, switched back to English."
+
+
+def test_language_switch_does_not_touch_config(monkeypatch):
+    monkeypatch.setattr(config, "SPEECH_LANGUAGE", "en-IN")
+    ctx = make_ctx()
+    handle(ctx, "change language to hindi")
+    assert config.SPEECH_LANGUAGE == "en-IN" and ctx.voice.language == "hi-IN"
+
+
+def test_hindi_wake_word_and_exit():
+    assert strip_wake_word("जार्विस मौसम कैसा है") == (True, "मौसम कैसा है")
+    ctx = make_ctx()
+    assert handle(ctx, "बाय") == "exit" and ctx.running is False
 
 
 def test_exit_stops():

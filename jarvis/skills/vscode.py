@@ -243,13 +243,13 @@ def _project_arg(ctx, match, prompt="Which project?"):
 
 
 # ---------------------------------------------------------------- skills
-@skill("vscode new window", rf"\bopen {VSC} here\b", rf"\bnew {VSC} window\b", rf"\bopen (?:a )?new {VSC} window\b")
+@skill("vscode new window", rf"\bopen {VSC} here\b", rf"\bnew {VSC} window\b", rf"\bopen (?:a )?new {VSC} window\b", category='vs code', help=['new VS Code window'])
 def new_window(ctx, command, match):
     shell("code -n")
     return "Opening a new VS Code window."
 
 
-@skill("vscode open file", rf"^(?:please\s+)?open\s+(?:the\s+)?file\s+(.+?)\s+(?:in|from)\s+(?:the\s+|my\s+)?(.+?)(?:\s+in\s+{VSC})?$")
+@skill("vscode open file", rf"^(?:please\s+)?open\s+(?:the\s+)?file\s+(.+?)\s+(?:in|from)\s+(?:the\s+|my\s+)?(.+?)(?:\s+in\s+{VSC})?$", category='vs code', help=['open file main dot py in jarvis'])
 def open_file(ctx, command, match):
     name, path = resolve_project(ctx, match.group(2))
     found = find_file(path, match.group(1))
@@ -260,7 +260,7 @@ def open_file(ctx, command, match):
 
 
 @skill("vscode list projects", r"\b(?:list|show|what are|tell me)\b.*\bprojects\b", r"\bmy projects\b",
-       r"\bhow many projects\b")
+       r"\bhow many projects\b", category='vs code', help=['list my projects'])
 def list_projects(ctx, command, match):
     projects = get_projects()
     if not projects:
@@ -273,14 +273,14 @@ def list_projects(ctx, command, match):
     return f"{count}: {say_list(shown)}{more}."
 
 
-@skill("vscode rescan", r"\b(?:rescan|re scan|refresh|reload|scan)\b.*\bprojects?\b")
+@skill("vscode rescan", r"\b(?:rescan|re scan|refresh|reload|scan)\b.*\bprojects?\b", category='vs code', help=['rescan projects'])
 def rescan(ctx, command, match):
     projects = get_projects(refresh=True)
     return f"Done. I found {len(projects)} project{'s' if len(projects) != 1 else ''}."
 
 
 @skill("git status", r"\bgit status\b(?:\s+(?:of|for|in|on))?(?:\s+(?:the|my))?\s*(.*?)(?:\s+(?:project|repo))?$",
-       r"\bwhat(?:'s| has| is)? changed in\s+(?:the\s+|my\s+)?(.+?)(?:\s+project)?$")
+       r"\bwhat(?:'s| has| is)? changed in\s+(?:the\s+|my\s+)?(.+?)(?:\s+project)?$", category='vs code', help=['git status of jarvis'])
 def git_status(ctx, command, match):
     name, path = resolve_project(ctx, _project_arg(ctx, match, "Which project's git status?"))
     result = git(path, "status", "--short", "--branch")
@@ -293,7 +293,7 @@ def git_status(ctx, command, match):
 
 
 @skill("git pull", r"^(?:please\s+)?(?:git\s+)?pull\s+(?:the\s+latest\s+(?:changes\s+)?(?:for|in|into)\s+)?(?:the\s+|my\s+)?(.+?)"
-                   r"(?:\s+(?:project|repo))?(?:\s+from\s+(?:github|origin|remote))?$")
+                   r"(?:\s+(?:project|repo))?(?:\s+from\s+(?:github|origin|remote))?$", category='vs code', help=['pull jarvis'])
 def git_pull(ctx, command, match):
     found = resolve_project(ctx, match.group(1), required=False)
     if found is None:
@@ -314,7 +314,7 @@ def git_pull(ctx, command, match):
 
 
 @skill("run project", r"^(?:please\s+)?(?:run|start|launch)\s+(?:the\s+|my\s+)?(.+?)\s+(?:project|app|server|dev server)$",
-       r"^(?:please\s+)?run\s+(?:the\s+|my\s+)?(.+)$")
+       r"^(?:please\s+)?run\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['run bogie backend'])
 def run_project(ctx, command, match):
     found = resolve_project(ctx, match.group(1), required=False)
     if found is None:
@@ -332,7 +332,7 @@ def run_project(ctx, command, match):
 
 @skill("vscode open project", rf"^(?:please\s+)?open\s+(?:the\s+|my\s+)?(?:project\s+)?(.+?)\s+(?:project\s+|folder\s+)?in\s+{VSC}$",
        r"^(?:please\s+)?open\s+(?:the\s+|my\s+)?(.+?)\s+project$", r"^(?:please\s+)?open\s+project\s+(.+)$",
-       r"^(?:let's\s+|i want to\s+)?work on\s+(?:the\s+|my\s+)?(.+)$")
+       r"^(?:let's\s+|i want to\s+)?work on\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['open jarvis in VS Code', 'work on bogie backend'])
 def open_project(ctx, command, match):
     name, path = resolve_project(ctx, match.group(1))
     shell(f'code "{path}"')

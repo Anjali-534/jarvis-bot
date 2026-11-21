@@ -133,7 +133,7 @@ def summary(reading):
 # ---------------------------------------------------------------- skills
 @skill("set location", r"\b(?:my (?:area|location|city|locality|pin ?code) is|i live in|i stay in|i am in|i'm in|"
                        r"set (?:my )?(?:location|area) to|change (?:my )?(?:location|area) to)\s+(.+)$",
-       r"^(?:pin ?code\s+)?(\d[\d\s-]{4,}\d)$")
+       r"^(?:pin ?code\s+)?(\d[\d\s-]{4,}\d)$", category='air quality', help=['my area is Rohini', '110085'])
 def set_location(ctx, command, match):
     raw = match.group(1).strip(" .")
     name = geo.find_pincode(raw) or geo.clean_place(raw) or raw
@@ -165,17 +165,17 @@ def _pollutant_reply(ctx, command, pollutant):
 PM = r"\bp\.?\s?m\.?\s?"
 
 
-@skill("pm2.5", PM + r"2(?:\s*(?:\.|point|dot)\s*|\s)?5\b", r"\bfine particles?\b", r"\bparticulate matter 2")
+@skill("pm2.5", PM + r"2(?:\s*(?:\.|point|dot)\s*|\s)?5\b", r"\bfine particles?\b", r"\bparticulate matter 2", category='air quality', help=['PM2.5 in Dwarka'])
 def pm25(ctx, command, match):
     return _pollutant_reply(ctx, command, "pm2_5")
 
 
-@skill("pm10", PM + r"(?:10|ten)\b")
+@skill("pm10", PM + r"(?:10|ten)\b", category='air quality', help=['PM10'])
 def pm10(ctx, command, match):
     return _pollutant_reply(ctx, command, "pm10")
 
 
-@skill("no2", r"\bn\.?\s?o\.?\s?(?:2|two)\b", r"\bnitrogen dioxide\b")
+@skill("no2", r"\bn\.?\s?o\.?\s?(?:2|two)\b", r"\bnitrogen dioxide\b", category='air quality', help=['NO2 level'])
 def no2(ctx, command, match):
     return _pollutant_reply(ctx, command, "nitrogen_dioxide")
 
@@ -198,7 +198,7 @@ def _waqi_red_zones(place):
     return stations
 
 
-@skill("red zones", r"\bred\s*zones?\b", r"\bred areas?\b", r"\bmost polluted\b", r"\bworst (?:air|aqi|areas?|pollution)\b")
+@skill("red zones", r"\bred\s*zones?\b", r"\bred areas?\b", r"\bmost polluted\b", r"\bworst (?:air|aqi|areas?|pollution)\b", category='air quality', help=['red zones'])
 def red_zones(ctx, command, match):
     threshold = config.RED_ZONE_THRESHOLD
     if config.WAQI_TOKEN:
@@ -233,14 +233,14 @@ _OUTDOOR = r"(?:go|step|walk|run|jog|exercise|play|cycle|be)\b"
        rf"\bis it safe\b(?!\s+to\s+(?!{_OUTDOOR})\w+)(?!\s+for\s+(?:me\s+)?to\s+(?!{_OUTDOOR})\w+)",
        rf"\bsafe\s+(?:to\s+{_OUTDOOR}|outside|outdoors|for\s+(?:a\s+)?(?:walk|run|jog|morning walk|kids|children|exercise))",
        r"\bpollution safe\b", r"\b(?:need|wear|carry) (?:a |my )?mask\b", r"\bmorning walk\b",
-       r"\bgo (?:out|outside)\b.*\b(?:safe|okay|ok)\b")
+       r"\bgo (?:out|outside)\b.*\b(?:safe|okay|ok)\b", category='air quality', help=['is it safe to go out', 'do I need a mask'])
 def safe_outside(ctx, command, match):
     reading = reading_for(ctx, command)
     return f"{summary(reading)} {reading.advice}"
 
 
 @skill("aqi", r"\ba\.?\s?q\.?\s?i\b", r"\bair quality\b", r"\bpollution\b", r"\bsmog\b", r"\bhow is the air\b",
-       r"\bair index\b")
+       r"\bair index\b", category='air quality', help=["what's the AQI", 'air quality in Noida'])
 def aqi_skill(ctx, command, match):
     reading = reading_for(ctx, command)
     return f"{summary(reading)} The main pollutant is {SPOKEN[reading.dominant]}. {reading.advice}"

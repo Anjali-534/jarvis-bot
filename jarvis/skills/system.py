@@ -51,7 +51,7 @@ def _steps(command, default=5):
 
 
 @skill("volume up", r"\bvolume up\b", r"\b(?:increase|raise|turn up)\s+(?:the\s+)?volume\b", r"\bturn (?:it|the volume) up\b",
-       r"\blouder\b", r"\bvolume (?:higher|increase)\b")
+       r"\blouder\b", r"\bvolume (?:higher|increase)\b", category='laptop', help=['volume up', 'volume up by 20'])
 @windows_only
 def volume_up(ctx, command, match):
     press("volumeup", _steps(command))
@@ -59,7 +59,7 @@ def volume_up(ctx, command, match):
 
 
 @skill("volume down", r"\bvolume down\b", r"\b(?:decrease|lower|reduce|turn down)\s+(?:the\s+)?volume\b",
-       r"\bturn (?:it|the volume) down\b", r"\b(?:quieter|softer)\b", r"\bvolume (?:lower|decrease)\b")
+       r"\bturn (?:it|the volume) down\b", r"\b(?:quieter|softer)\b", r"\bvolume (?:lower|decrease)\b", category='laptop', help=['turn down the volume'])
 @windows_only
 def volume_down(ctx, command, match):
     press("volumedown", _steps(command))
@@ -67,7 +67,7 @@ def volume_down(ctx, command, match):
 
 
 @skill("mute", r"^(?:please\s+)?(?:un)?mute(?:\s+(?:the\s+)?(?:volume|sound|audio|laptop|speakers?))?$",
-       r"\b(?:un)?mute the (?:volume|sound|audio)\b")
+       r"\b(?:un)?mute the (?:volume|sound|audio)\b", category='laptop', help=['mute'])
 @windows_only
 def mute(ctx, command, match):
     press("volumemute")
@@ -75,21 +75,21 @@ def mute(ctx, command, match):
 
 
 @skill("play pause", r"^(?:please\s+)?(?:pause|resume|unpause)(?:\s+(?:the\s+)?(?:music|song|video|media|playback|it))?$",
-       r"\bplay\s*pause\b", r"^(?:stop|pause) the (?:music|song|video)$")
+       r"\bplay\s*pause\b", r"^(?:stop|pause) the (?:music|song|video)$", category='laptop', help=['pause the music', 'resume'])
 @windows_only
 def play_pause(ctx, command, match):
     press("playpause")
     return ""
 
 
-@skill("next track", r"^(?:next|skip)$", r"\b(?:next|skip)(?:\s+(?:the|this))?\s+(?:song|track|video)\b", r"\bplay (?:the )?next\b")
+@skill("next track", r"^(?:next|skip)$", r"\b(?:next|skip)(?:\s+(?:the|this))?\s+(?:song|track|video)\b", r"\bplay (?:the )?next\b", category='laptop', help=['next song'])
 @windows_only
 def next_track(ctx, command, match):
     press("nexttrack")
     return ""
 
 
-@skill("previous track", r"^previous$", r"\bprevious\s+(?:song|track|video)\b", r"\b(?:last|go back to the)\s+(?:song|track)\b")
+@skill("previous track", r"^previous$", r"\bprevious\s+(?:song|track|video)\b", r"\b(?:last|go back to the)\s+(?:song|track)\b", category='laptop', help=['previous song'])
 @windows_only
 def previous_track(ctx, command, match):
     press("prevtrack")
@@ -112,7 +112,7 @@ def set_brightness(level):
     return out.returncode == 0 and not (out.stderr or "").strip()
 
 
-@skill("brightness", r"\bbrightness\b", r"\b(?:brighter|dimmer)\b", r"\bdim the screen\b")
+@skill("brightness", r"\bbrightness\b", r"\b(?:brighter|dimmer)\b", r"\bdim the screen\b", category='laptop', help=['brightness 70', 'brightness up'])
 @windows_only
 def brightness(ctx, command, match):
     step_match = re.search(r"\bby\s+(\d{1,3})", command)
@@ -137,7 +137,7 @@ def brightness(ctx, command, match):
 
 
 # ---------------------------------------------------------------- screenshot, battery, status
-@skill("screenshot", r"\bscreen\s?shot\b", r"\bcapture (?:the |my )?screen\b", r"\bsnap the screen\b")
+@skill("screenshot", r"\bscreen\s?shot\b", r"\bcapture (?:the |my )?screen\b", r"\bsnap the screen\b", category='laptop', help=['take a screenshot'])
 def screenshot(ctx, command, match):
     import pyautogui
 
@@ -149,7 +149,7 @@ def screenshot(ctx, command, match):
     return f"Screenshot saved in your {folder.name} folder."
 
 
-@skill("battery", r"\bbattery\b", r"\bcharg(?:e|ing)\s+(?:level|status|left|percentage)\b", r"\bhow much charge\b")
+@skill("battery", r"\bbattery\b", r"\bcharg(?:e|ing)\s+(?:level|status|left|percentage)\b", r"\bhow much charge\b", category='laptop', help=['battery status'])
 def battery(ctx, command, match):
     import psutil
 
@@ -169,7 +169,7 @@ def battery(ctx, command, match):
 
 
 @skill("system status", r"\bsystem (?:status|info|health|usage|stats)\b", r"\bcpu\b", r"\b(?:ram|memory) usage\b",
-       r"\bdisk (?:space|usage)\b", r"\bhow is my (?:laptop|pc|computer|system)(?: doing)?\b")
+       r"\bdisk (?:space|usage)\b", r"\bhow is my (?:laptop|pc|computer|system)(?: doing)?\b", category='laptop', help=['system status'])
 def system_status(ctx, command, match):
     import psutil
 
@@ -182,7 +182,7 @@ def system_status(ctx, command, match):
 
 
 # ---------------------------------------------------------------- lock, power, sleep
-@skill("lock", r"\block\s+(?:the\s+|my\s+)?(?:screen|laptop|pc|computer|system|windows)\b", r"^lock(?: it)?$")
+@skill("lock", r"\block\s+(?:the\s+|my\s+)?(?:screen|laptop|pc|computer|system|windows)\b", r"^lock(?: it)?$", category='laptop', help=['lock the laptop'])
 @windows_only
 def lock(ctx, command, match):
     ctx.say("Locking your laptop.")
@@ -190,7 +190,7 @@ def lock(ctx, command, match):
     return ""
 
 
-@skill("cancel shutdown", r"\b(?:cancel|abort|stop)\b.*\b(?:shut\s?down|restart|reboot)\b")
+@skill("cancel shutdown", r"\b(?:cancel|abort|stop)\b.*\b(?:shut\s?down|restart|reboot)\b", category='laptop', help=['cancel shutdown'])
 @windows_only
 def cancel_shutdown(ctx, command, match):
     result = run(["shutdown", "/a"])
@@ -202,7 +202,7 @@ def cancel_shutdown(ctx, command, match):
 @skill("power", rf"^(?:please\s+)?(?:shut\s?down|restart|reboot){DEVICE}(?:\s+(?:in|after)\s+.+)?$",
        r"\b(?:turn|power|switch)\s+off\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
        r"\bshut\s?down\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
-       r"\b(?:restart|reboot)\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b")
+       r"\b(?:restart|reboot)\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b", category='laptop', help=['shut down the laptop', 'restart in 10 minutes'])
 @windows_only
 def power(ctx, command, match):
     restart = bool(re.search(r"\b(?:restart|reboot)\b", command))
@@ -218,7 +218,7 @@ def power(ctx, command, match):
 
 
 @skill("sleep pc", r"\b(?:sleep|hibernate)\b.*\b(?:laptop|pc|computer|system|machine)\b",
-       r"\b(?:laptop|pc|computer|system|machine)\b.*\b(?:to\s+)?sleep\b")
+       r"\b(?:laptop|pc|computer|system|machine)\b.*\b(?:to\s+)?sleep\b", category='laptop', help=['put the laptop to sleep'])
 @windows_only
 def sleep_pc(ctx, command, match):
     if not ctx.confirm("Put the laptop to sleep now?"):

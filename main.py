@@ -18,6 +18,7 @@ from jarvis.skills.general import time_of_day
 def _wake_words():
     words = set(config.WAKE_WORDS)
     words |= {w.replace("ok ", "okay ") for w in words if w.startswith("ok ")}
+    words |= {"जार्विस", "हे जार्विस"}  # how Hindi speech recognition writes "Jarvis"
     return sorted(words, key=len, reverse=True)
 
 
@@ -61,8 +62,9 @@ def run(text_mode=False, wake_enabled=True, mute=False, voice=None):
         wake_enabled = False  # typing "jarvis" every time is pointless
     ctx = Context(voice)
     ctx.say(f"Good {time_of_day()}, {config.USER_NAME}. {config.ASSISTANT_NAME} is online.")
-    if wake_enabled:
-        print(f"(Say '{config.WAKE_WORDS[0]}' followed by a command. Say 'help' to hear what I can do.)")
+    name = config.ASSISTANT_NAME
+    print(f"Say '{name}, help' to hear what I can do. Full list: COMMANDS.md"
+          if wake_enabled else "Say 'help' to hear what I can do. Full list: COMMANDS.md")
     last_reply = time.monotonic()
     misses = 0
     try:

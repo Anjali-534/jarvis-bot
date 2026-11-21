@@ -18,13 +18,22 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 
 | Setting | What it does |
 |---|---|
-| `AI_API_KEY` | Lets Jarvis answer any question. Works with any OpenAI-compatible API; set `AI_BASE_URL` and `AI_MODEL` for other providers. |
+| `AI_API_KEY` | Lets Jarvis answer any question. Works with any OpenAI-compatible API; set `AI_BASE_URL` and `AI_MODEL` to match (free options below). |
 | `WAQI_TOKEN` | A free token from <https://aqicn.org/data-platform/token/>. Red zones then come from real CPCB monitoring stations. |
 | `DEFAULT_LOCATION` | Used until you tell Jarvis your area. Defaults to New Delhi. |
 | `VOICE_NAME`, `VOICE_RATE` | Part of a Windows voice name (`zira`, `david`, `heera`...) and the speaking speed. |
 | `WAKE_WORDS`, `FOLLOW_UP_SECONDS` | The wake phrases, and how long you can keep talking without one after a reply. |
 | `WHATSAPP_SEND_DELAY` | Seconds to wait for WhatsApp to open a chat before pressing Enter (default 3). |
 | `PROJECT_ROOTS` | Folders to scan for code projects, separated by `;`. Defaults to `C:\Users\ADMIN\OneDrive\Desktop\ANJALI`. |
+
+Free AI keys:
+
+| Provider | Get a key | `AI_BASE_URL` | `AI_MODEL` |
+|---|---|---|---|
+| Gemini (Google AI Studio) | <https://aistudio.google.com/apikey> | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` |
+| Groq | <https://console.groq.com/keys> | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+
+If the key is wrong, the model name is wrong, or the free quota runs out, Jarvis says so instead of failing silently.
 
 For WhatsApp, copy `contacts.example.json` to `data\contacts.json` and add your contacts (country code plus number, digits only), or add them by voice. For extra project names, copy `projects.example.json` to `data\projects.json`. Everything in `data\` is git-ignored.
 
@@ -43,6 +52,8 @@ python -m pytest -q       # run the offline tests
 With no microphone, Jarvis switches to text mode automatically. After it replies you have `FOLLOW_UP_SECONDS` (20 by default) to carry on without saying the wake word. Press Ctrl+C to quit at any time.
 
 ## What you can say
+
+📄 **Printable cheat sheet: [COMMANDS.md](COMMANDS.md).** Say "Jarvis, help" for the categories, or "help with WhatsApp" (or laptop, VS Code...) for examples from one category.
 
 **Wake and control**
 - "Jarvis", "Hey Jarvis", or "OK Jarvis", at the start or end of a sentence
@@ -117,6 +128,8 @@ Reminders only fire while Jarvis is running.
 - "Tell me a joke"
 - "Who is Sachin Tendulkar", "tell me about the Taj Mahal", "what is Python" (Wikipedia)
 - Anything else goes to the AI (needs `AI_API_KEY`). "Forget our conversation" clears its memory.
+- Speak Hindi or Hinglish to the AI and it replies in Hinglish written in Roman letters, which the Windows voice can read.
+- "Switch to Hindi" makes speech recognition listen for Hindi (`hi-IN`), and "switch to English" switches back. This lasts for the session only. In Hindi mode, Google writes what you say in Devanagari, so the English command phrases won't match; it works best for chatting with the AI. For Hinglish commands, English mode usually works better.
 
 ## Architecture
 
@@ -192,6 +205,6 @@ Some guidelines:
 - **VS Code:** recent projects, run tests by voice
 - **Spotify:** play playlists and liked songs through the Spotify API
 - **Calendar and email:** today's meetings, read and draft emails
-- **Hindi commands:** `SPEECH_LANGUAGE=hi-IN`, Hindi patterns and replies
+- **Hindi commands:** Devanagari patterns for the main skills, so commands also work in Hindi mode
 - Offline wake word (Porcupine / openWakeWord) and offline speech recognition
 - Reminders that persist across restarts

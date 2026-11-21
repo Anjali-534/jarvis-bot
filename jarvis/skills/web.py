@@ -19,7 +19,7 @@ def find_youtube_video(query):
     return found.group(1) if found else None
 
 
-@skill("play youtube", r"^(?:please\s+)?play\s+(.+?)(?:\s+(?:on|in|from)\s+youtube)?$", help="play lofi beats")
+@skill("play youtube", r"^(?:please\s+)?play\s+(.+?)(?:\s+(?:on|in|from)\s+youtube)?$", category='web', help=['play Arijit Singh songs', 'play lofi beats on YouTube'])
 def play_youtube(ctx, command, match):
     query = match.group(1).strip()
     try:
@@ -35,14 +35,14 @@ def play_youtube(ctx, command, match):
 
 
 @skill("youtube search", r"\bsearch\s+(?:for\s+)?(.+?)\s+(?:on|in)\s+youtube\b", r"\bsearch youtube for\s+(.+)$",
-       r"^youtube\s+(?:search\s+)?(?:for\s+)?(.+)$")
+       r"^youtube\s+(?:search\s+)?(?:for\s+)?(.+)$", category='web', help=['search lofi music on YouTube'])
 def youtube_search(ctx, command, match):
     query = match.group(1).strip()
     open_url(f"https://www.youtube.com/results?search_query={quote_plus(query)}")
     return f"Searching YouTube for {query}."
 
 
-@skill("google", r"^(?:please\s+)?(?:search|google|look up|search for|search google for)\s+(?:for\s+)?(.+?)(?:\s+on google)?$")
+@skill("google", r"^(?:please\s+)?(?:search|google|look up|search for|search google for)\s+(?:for\s+)?(.+?)(?:\s+on google)?$", category='web', help=['search best laptops under 60000'])
 def google(ctx, command, match):
     query = match.group(1).strip()
     open_url(f"https://www.google.com/search?q={quote_plus(query)}")
@@ -81,7 +81,7 @@ def headlines(topic="", limit=5):
     return titles
 
 
-@skill("news", r"\bnews\b", r"\bheadlines\b")
+@skill("news", r"\bnews\b", r"\bheadlines\b", category='web', help=['news', 'news about cricket'])
 def news(ctx, command, match):
     topic = news_topic(command)
     titles = headlines(topic)

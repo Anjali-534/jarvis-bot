@@ -29,7 +29,7 @@ def wikipedia_summary(topic):
 
 @skill("wikipedia",
        r"^(?:who\s+(?:is|was|are|were)|tell me (?:something )?about|what\s+(?:is|are|was|were)(?:\s+(?:a|an|the))?|"
-       r"search wikipedia for|wikipedia)\s+(.+?)\??$")
+       r"search wikipedia for|wikipedia)\s+(.+?)\??$", category='general', help=['who is Sachin Tendulkar', 'tell me about the Taj Mahal'])
 def wikipedia(ctx, command, match):
     topic = match.group(1).strip()
     if not topic or len(topic) < 2 or re.search(r"\b(?:you|your|my|i|me|this|that|it)\b", topic):

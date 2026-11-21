@@ -9,6 +9,7 @@ class Voice:
     def __init__(self, text_mode=False, mute=False):
         self.text_mode = text_mode
         self.mute = mute
+        self.language = config.SPEECH_LANGUAGE  # "switch to hindi" changes this for the session
         self._queue = queue.Queue()
         self._tts_ok = False
         self._thread = None
@@ -116,7 +117,7 @@ class Voice:
             print(f"[voice] Microphone error: {exc}")
             return ""
         try:
-            text = self.recognizer.recognize_google(audio, language=config.SPEECH_LANGUAGE)
+            text = self.recognizer.recognize_google(audio, language=self.language)
         except sr.UnknownValueError:
             return ""
         except sr.RequestError as exc:

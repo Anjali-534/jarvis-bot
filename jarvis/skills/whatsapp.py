@@ -152,7 +152,7 @@ def send(number, text):
 # ---------------------------------------------------------------- skills
 @skill("whatsapp add contact",
        r"^(?:please\s+)?(?:add|save|create)\s+(?:a\s+)?(?:new\s+)?(?:whats\s?app\s+)?contact\s+(.+?)\s+"
-       r"(?:with\s+(?:the\s+)?(?:phone\s+)?number\s+|number\s+|as\s+|on\s+)?(\+?\d[\d\s-]{7,}\d)$")
+       r"(?:with\s+(?:the\s+)?(?:phone\s+)?number\s+|number\s+|as\s+|on\s+)?(\+?\d[\d\s-]{7,}\d)$", category='whatsapp', help=['add contact Riya 98765 43210'])
 def add_contact(ctx, command, match):
     name = re.sub(r"\s+(?:with|number|phone)$", "", match.group(1).strip(" ,")).strip()
     number = normalize_number(match.group(2))
@@ -167,7 +167,7 @@ def add_contact(ctx, command, match):
 
 
 @skill("whatsapp call", rf"^(?:please\s+)?(?:video\s+|voice\s+)?call\s+(.+?)\s+on\s+{WA}$",
-       rf"^(?:please\s+)?{WA}\s+(?:video\s+|voice\s+)?call\s+(?:to\s+)?(.+)$")
+       rf"^(?:please\s+)?{WA}\s+(?:video\s+|voice\s+)?call\s+(?:to\s+)?(.+)$", category='whatsapp', help=['call mom on WhatsApp'])
 def call_contact(ctx, command, match):
     contacts = load_contacts()
     found = resolve_contact(match.group(1), contacts)
@@ -182,7 +182,7 @@ def call_contact(ctx, command, match):
 
 
 @skill("whatsapp message", rf"^(?:please\s+)?(?:send|write|message|text|msg|tell)\b.*\b{WA}\b",
-       rf"^(?:please\s+)?{WA}\s+\S", help="send a whatsapp to mom saying I'll be late")
+       rf"^(?:please\s+)?{WA}\s+\S", category='whatsapp', help=["send a WhatsApp to mom saying I'll be late", 'message Dhruv on WhatsApp that the demo is at 5', 'WhatsApp mom'])
 def send_message(ctx, command, match):
     parsed = parse_message_command(command)
     if not parsed:
