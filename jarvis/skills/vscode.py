@@ -4,6 +4,7 @@ Projects are found by scanning PROJECT_ROOTS (2 levels deep) for folders contain
 project marker, merged with manual aliases from data/projects.json. For safety, git is
 read-only apart from a confirmed `pull`; nothing commits, pushes or resets by voice.
 """
+import logging
 import difflib
 import json
 import os
@@ -13,6 +14,8 @@ from pathlib import Path
 
 import config
 from jarvis.router import SpokenError, skill
+
+log = logging.getLogger(__name__)
 
 MARKERS = (".git", "package.json", "go.mod", "requirements.txt")
 IGNORED_DIRS = {"node_modules", ".git", "dist", "build", ".next", "__pycache__", ".venv", "venv", "env",
@@ -27,7 +30,7 @@ _cache: dict | None = None
 # ---------------------------------------------------------------- side effects (replaced in tests)
 def shell(command):
     """Run a shell command without waiting (used for `code` and `start`)."""
-    print(f"[vscode] {command}")
+    log.info(f"[vscode] {command}")
     subprocess.Popen(command, shell=True)
 
 
@@ -80,7 +83,7 @@ def load_aliases():
     try:
         data = json.loads(path.read_text(encoding="utf-8") or "{}")
     except json.JSONDecodeError:
-        print(f"[vscode] {path} is not valid JSON")
+        log.warning(f"[vscode] {path} is not valid JSON")
         return {}
     return {spoken(k): Path(os.path.expandvars(os.path.expanduser(v))) for k, v in data.items()}
 
@@ -287,7 +290,7 @@ def git_status(ctx, command, match):
     if result.returncode != 0:
         if "not a git repository" in (result.stderr or "").lower():
             return f"{name.title()} isn't a git repository."
-        print(f"[git] {result.stderr.strip()}")
+        log.warning("[git] %s", result.stderr.strip())
         return f"Git couldn't read the status of {name}."
     return summarize_status(name, result.stdout)
 
@@ -306,7 +309,7 @@ def git_pull(ctx, command, match):
     result = git(path, "pull", "--ff-only", timeout=120)
     output = (result.stdout or "") + (result.stderr or "")
     if result.returncode != 0:
-        print(f"[git] {output.strip()}")
+        log.warning("[git] %s", output.strip())
         return f"The pull into {name} failed. Check the terminal for details."
     if "already up to date" in output.lower():
         return f"{name.title()} is already up to date."

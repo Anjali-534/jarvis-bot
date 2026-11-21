@@ -43,9 +43,15 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "WAQI_TOKEN", "")
     monkeypatch.setattr(config, "AI_API_KEY", "")
     monkeypatch.setattr(config, "WHATSAPP_SEND_DELAY", 3.0)
+    monkeypatch.setattr(config, "NOTIFY", False)          # no real toasts popping up during tests
+    monkeypatch.setattr(config, "LOG_DIR", tmp_path / "data" / "logs")
     monkeypatch.setattr(config, "RED_ZONE_THRESHOLD", 200)
     monkeypatch.setattr(config, "CONTACTS_FILE", tmp_path / "data" / "contacts.json")
     monkeypatch.setattr(config, "PROJECTS_FILE", tmp_path / "data" / "projects.json")
     monkeypatch.setattr(config, "PROJECT_ROOTS", [])
     monkeypatch.setattr(vscode, "_cache", None)
     geo._CACHE.clear()
+    yield
+    from jarvis.skills import notes
+
+    notes.cancel_all_timers()  # a reminder must not fire into a later test (or pop a real toast)

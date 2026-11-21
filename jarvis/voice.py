@@ -1,8 +1,11 @@
 """Text-to-speech (on its own worker thread) and speech-to-text."""
+import logging
 import queue
 import threading
 
 import config
+
+log = logging.getLogger(__name__)
 
 
 def speakable(text):
@@ -50,7 +53,7 @@ class Voice:
             engine.setProperty("volume", 1.0)
             self._tts_ok = True
         except Exception as exc:
-            print(f"[voice] Text-to-speech unavailable ({exc}); I'll print replies instead.")
+            log.warning(f"[voice] Text-to-speech unavailable ({exc}); I'll print replies instead.")
         finally:
             ready.set()
         if not self._tts_ok:
@@ -64,7 +67,7 @@ class Voice:
                 engine.say(text)
                 engine.runAndWait()
             except Exception as exc:
-                print(f"[voice] TTS error: {exc}")
+                log.warning(f"[voice] TTS error: {exc}")
             finally:
                 done.set()
 
@@ -80,7 +83,7 @@ class Voice:
         engine.setProperty("voice", chosen.id)
 
     def speak(self, text, wait=True):
-        print(f"{config.ASSISTANT_NAME}: {text}")
+        log.info(f"{config.ASSISTANT_NAME}: {text}")
         if not self._tts_ok:
             return
         done = threading.Event()
@@ -97,11 +100,11 @@ class Voice:
             self.recognizer.dynamic_energy_threshold = True
             self.recognizer.pause_threshold = 0.8
             self.microphone = sr.Microphone()
-            print("[voice] Calibrating for background noise, please stay quiet...")
+            log.info("[voice] Calibrating for background noise, please stay quiet...")
             with self.microphone as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
         except Exception as exc:
-            print(f"[voice] No microphone available ({exc}). Switching to text mode.")
+            log.warning(f"[voice] No microphone available ({exc}). Switching to text mode.")
             self.text_mode = True
             self.microphone = None
 
@@ -116,21 +119,21 @@ class Voice:
 
         try:
             with self.microphone as source:
-                print("Listening...")
+                log.info("Listening...")
                 audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
         except sr.WaitTimeoutError:
             return ""
         except Exception as exc:
-            print(f"[voice] Microphone error: {exc}")
+            log.warning(f"[voice] Microphone error: {exc}")
             return ""
         try:
             text = self.recognizer.recognize_google(audio, language=self.language)
         except sr.UnknownValueError:
             return ""
         except sr.RequestError as exc:
-            print(f"[voice] Speech service error: {exc}")
+            log.warning(f"[voice] Speech service error: {exc}")
             return ""
-        print(f"You said: {text}")
+        log.info(f"You said: {text}")
         return text.strip().lower()
 
     def close(self):

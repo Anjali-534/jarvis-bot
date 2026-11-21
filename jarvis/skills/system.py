@@ -1,4 +1,5 @@
 """Windows laptop controls: volume, media, brightness, screenshots, battery, lock, power."""
+import logging
 import os
 import re
 import subprocess
@@ -8,6 +9,8 @@ from datetime import datetime
 import config
 from jarvis.router import skill
 from jarvis.timeparse import find_duration, say_duration
+
+log = logging.getLogger(__name__)
 
 IS_WINDOWS = sys.platform == "win32"
 NOT_WINDOWS = "Sorry, that only works on Windows."
@@ -145,7 +148,7 @@ def screenshot(ctx, command, match):
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"Screenshot {datetime.now():%Y-%m-%d %H-%M-%S}.png"
     pyautogui.screenshot(str(path))
-    print(f"[screenshot] saved to {path}")
+    log.info(f"[screenshot] saved to {path}")
     return f"Screenshot saved in your {folder.name} folder."
 
 
@@ -227,3 +230,37 @@ def sleep_pc(ctx, command, match):
     powershell("Add-Type -AssemblyName System.Windows.Forms; "
                "[System.Windows.Forms.Application]::SetSuspendState('Suspend', $false, $false) | Out-Null")
     return ""
+
+
+# ---------------------------------------------------------------- start with Windows
+_BOOT = r"(?:windows|startup|start up|login|log in|boot|my laptop|the laptop|my computer)"
+
+
+@skill("stop autostart", rf"\b(?:don't|dont|do not|never|stop)\s+(?:auto\s?)?(?:start|launch|run|open)(?:ing)?\b.*\b{_BOOT}\b",
+       r"\b(?:disable|remove|turn off|switch off)\s+(?:the\s+)?(?:auto\s?start|autostart|startup|start with windows)\b",
+       category="laptop", help=["don't start with Windows"])
+@windows_only
+def stop_autostart(ctx, command, match):
+    from jarvis import startup
+
+    if not startup.is_installed():
+        return f"{config.ASSISTANT_NAME} isn't set to start with Windows."
+    if not ctx.confirm(f"Stop {config.ASSISTANT_NAME} from starting when you log in?"):
+        return "Okay, I'll keep starting with Windows."
+    startup.uninstall()
+    return f"Done. {config.ASSISTANT_NAME} won't start with Windows any more."
+
+
+@skill("autostart", rf"\b(?:auto\s?)?(?:start|launch|run|open)\s+(?:(?:jarvis|yourself|automatically)\s+){{0,2}}(?:with|on|at|when)\s+(?:i\s+)?{_BOOT}\b",
+       r"\b(?:enable|turn on|switch on)\s+(?:the\s+)?(?:auto\s?start|autostart|start with windows)\b",
+       category="laptop", help=["start with Windows"])
+@windows_only
+def autostart(ctx, command, match):
+    from jarvis import startup
+
+    if startup.is_installed():
+        return f"{config.ASSISTANT_NAME} already starts with Windows."
+    if not ctx.confirm(f"Start {config.ASSISTANT_NAME} in the tray every time you log in?"):
+        return "Okay, I won't."
+    startup.install()
+    return f"Done. {config.ASSISTANT_NAME} will start in the tray when you log in."

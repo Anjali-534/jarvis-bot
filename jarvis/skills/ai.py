@@ -1,10 +1,13 @@
 """AI fallback: anything no other skill handled goes to an OpenAI-compatible chat API."""
+import logging
 import re
 from datetime import datetime
 
 import config
 from jarvis import http
 from jarvis.router import fallback, skill
+
+log = logging.getLogger(__name__)
 
 MAX_TURNS = 8
 
@@ -69,7 +72,7 @@ def ai(ctx, command, match=None):
     )
     if response.status_code >= 400:
         body = getattr(response, "text", "") or ""
-        print(f"[ai] HTTP {response.status_code}: {body[:300]}")
+        log.warning("[ai] HTTP %s: %s", response.status_code, body[:300])
         return error_message(response.status_code, body)
     reply = strip_markdown(response.json()["choices"][0]["message"]["content"] or "")
     if not reply:

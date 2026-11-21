@@ -1,4 +1,5 @@
 """Small talk, time/date, exit/sleep, help, calculator and jokes."""
+import logging
 import ast
 import math
 import operator
@@ -9,6 +10,8 @@ from datetime import datetime
 import config
 from jarvis.router import skill
 from jarvis.timeparse import NUMBER_WORDS
+
+log = logging.getLogger(__name__)
 
 PC_WORDS = re.compile(r"\b(?:laptop|pc|computer|system|windows)\b")
 
@@ -118,7 +121,7 @@ def help_category(ctx, command, match):
         return None  # "help me write an email" goes to the AI
     title = CATEGORIES[key][0]
     examples = [e[:1].upper() + e[1:] for e in examples_for(key, limit=6, spoken=True)]
-    print(f"\n{title[:1].upper()}{title[1:]}:\n" + "\n".join(f'  - "{e}"' for e in examples_for(key)) + "\n")
+    log.info(f"\n{title[:1].upper()}{title[1:]}:\n" + "\n".join(f'  - "{e}"' for e in examples_for(key)) + "\n")
     return f"For {title}, you can say: " + ". ".join(examples) + "."
 
 
@@ -126,7 +129,7 @@ def help_category(ctx, command, match):
        r"\bwhat (?:are your|commands do you)\b", r"\b(?:list|show) (?:your )?(?:commands|features)\b",
        category="general", help=["help", "help with WhatsApp"])
 def help_skill(ctx, command, match):
-    print(full_command_list())
+    log.info(full_command_list())
     return SHORT_HELP
 
 

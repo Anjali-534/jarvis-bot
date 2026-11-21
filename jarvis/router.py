@@ -6,12 +6,14 @@ A skill is a function ``handler(ctx, command, match)`` registered with ``@skill`
 * return "" or True          -> handled, nothing more to say
 * return None                -> "not mine", the router tries the next skill
 """
+import logging
 import re
-import traceback
 from dataclasses import dataclass, field
 from typing import Callable
 
 import requests
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -107,10 +109,10 @@ def _run(ctx, sk, command, match):
     except SpokenError as exc:
         return str(exc)
     except requests.RequestException as exc:
-        print(f"[{sk.name}] network error: {exc}")
+        log.warning(f"[{sk.name}] network error: {exc}")
         return "I couldn't reach the online service right now. Please check your internet and try again."
     except Exception:  # never let one skill crash the assistant
-        traceback.print_exc()
+        log.exception("Skill %s crashed", sk.name)
         return "Sorry, something went wrong while doing that."
 
 
@@ -143,7 +145,7 @@ def handle(ctx, command):
         # Hindi mode: try the English rewrite first; chat that isn't a command reaches the AI unchanged
         rewritten = translit.normalize_command(command)
         if rewritten != command:
-            print(f"(understood as: {rewritten})")
+            log.info(f"(understood as: {rewritten})")
             handled = _try_skills(ctx, rewritten)
             if handled:
                 return handled

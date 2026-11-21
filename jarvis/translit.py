@@ -12,9 +12,12 @@ text contains Devanagari, and:
 Messages, notes and reminder texts are kept exactly as spoken. If the result doesn't match
 any skill, the router sends the ORIGINAL text to the AI, so chatting in Hindi still works.
 """
+import logging
 import difflib
 import re
 import unicodedata
+
+log = logging.getLogger(__name__)
 
 DEVANAGARI = re.compile(r"[ऀ-ॿ]")
 _DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
@@ -216,7 +219,7 @@ def _known_names():
 
         names |= set(apps.APPS) | set(apps.WEBSITES) | set(whatsapp.load_contacts()) | set(vscode.get_projects())
     except Exception as exc:  # never let lookups break routing
-        print(f"[translit] name lookup failed: {exc}")
+        log.warning(f"[translit] name lookup failed: {exc}")
     return names
 
 

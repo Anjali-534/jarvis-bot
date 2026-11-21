@@ -1,4 +1,5 @@
 """Live air quality: Indian CPCB AQI from Open-Meteo, red zones from WAQI or Open-Meteo."""
+import logging
 import re
 from dataclasses import dataclass
 
@@ -6,6 +7,8 @@ import config
 from jarvis import geo, http
 from jarvis.geo import Place
 from jarvis.router import skill
+
+log = logging.getLogger(__name__)
 
 AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 WAQI_BOUNDS_URL = "https://api.waqi.info/v2/map/bounds"
@@ -206,7 +209,7 @@ def red_zones(ctx, command, match):
         try:
             stations = _waqi_red_zones(place)
         except ValueError as exc:
-            print(f"[aqi] {exc}; falling back to Open-Meteo")
+            log.info(f"[aqi] {exc}; falling back to Open-Meteo")
             stations = None
         if stations:
             red = [s for s in stations if s[1] > threshold][:6]

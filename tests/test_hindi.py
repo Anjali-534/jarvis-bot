@@ -80,9 +80,10 @@ def test_hindi_wake_word(heard, expected):
     assert strip_wake_word(heard) == expected
 
 
-def test_understood_as_is_printed(recorded_skills, capsys):
+def test_understood_as_is_logged(recorded_skills, caplog):
+    caplog.set_level("INFO")
     handle(make_ctx(), "क्रोम खोलो")
-    assert "(understood as: open chrome)" in capsys.readouterr().out
+    assert "(understood as: open chrome)" in caplog.text
 
 
 def test_english_text_is_untouched():

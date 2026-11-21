@@ -5,6 +5,7 @@ import threading
 from datetime import datetime, timedelta
 
 import config
+from jarvis import notify
 from jarvis.router import skill
 from jarvis.timeparse import find_clock, find_duration, say_clock, say_duration
 
@@ -68,6 +69,12 @@ def take_note(ctx, command, match):
 
 # ---------------------------------------------------------------- reminders and timers
 _ids = itertools.count(1)
+_ALL_TIMERS = []  # every reminder/timer thread, so shutdown (and tests) can cancel them
+
+
+def cancel_all_timers():
+    while _ALL_TIMERS:
+        _ALL_TIMERS.pop().cancel()
 
 
 def _reminders(ctx):
@@ -81,13 +88,16 @@ def schedule(ctx, delay_seconds, message, kind="reminder"):
         if entry in _reminders(ctx):
             _reminders(ctx).remove(entry)
         if kind == "timer":
+            notify.toast("Timer done", f"Your {message} timer is done.")
             ctx.say(f"Time's up, {config.USER_NAME}! Your {message} timer is done.", wait=False)
         else:
+            notify.toast("Reminder", message)  # visible even while muted or in a meeting
             ctx.say(f"Reminder, {config.USER_NAME}: {message}", wait=False)
 
     timer = threading.Timer(delay_seconds, fire)
     timer.daemon = True
     entry["timer"] = timer
+    _ALL_TIMERS.append(timer)
     _reminders(ctx).append(entry)
     timer.start()
     return entry

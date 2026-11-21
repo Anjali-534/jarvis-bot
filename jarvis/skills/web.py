@@ -1,4 +1,5 @@
 """YouTube, Google search and news."""
+import logging
 import re
 import webbrowser
 import xml.etree.ElementTree as ET
@@ -6,6 +7,8 @@ from urllib.parse import quote_plus
 
 from jarvis import http
 from jarvis.router import skill
+
+log = logging.getLogger(__name__)
 
 
 def open_url(url):
@@ -25,7 +28,7 @@ def play_youtube(ctx, command, match):
     try:
         video = find_youtube_video(query)
     except Exception as exc:
-        print(f"[youtube] search failed: {exc}")
+        log.warning(f"[youtube] search failed: {exc}")
         video = None
     if video:
         open_url(f"https://www.youtube.com/watch?v={video}")

@@ -6,3 +6,7 @@ python-dotenv
 psutil
 pyautogui
 pyjokes
+pystray
+Pillow
+pynput
+win11toast

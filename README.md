@@ -51,6 +51,21 @@ python -m pytest -q       # run the offline tests
 
 With no microphone, Jarvis switches to text mode automatically. After it replies you have `FOLLOW_UP_SECONDS` (20 by default) to carry on without saying the wake word. Press Ctrl+C to quit at any time.
 
+## Running in the background
+
+```powershell
+pythonw run_jarvis.pyw        # tray icon, no console window (or just double-click run_jarvis.pyw)
+python install_startup.py     # start in the tray every time you log in
+python uninstall_startup.py   # undo that
+```
+
+- **Tray icon:** an orange "J" with a status dot. Green means listening, grey sleeping, red mic muted; hover to see the status. The right-click menu has Wake up, Sleep, Mute mic / Unmute, Open COMMANDS.md, Open notes, Open logs, Restart Jarvis and Quit. Saying "goodbye" closes the tray too.
+- **Hotkey:** **Ctrl+Alt+J** (set `HOTKEY` in `.env`, or leave it empty to turn it off) wakes Jarvis instantly. It beeps, and the next phrase doesn't need the wake word. It uses `pynput`, which doesn't need admin rights, and also works in `python main.py`.
+- **Start on login:** `install_startup.py`, or saying "start with Windows" (asks first), puts a `Jarvis.lnk` shortcut in your Startup folder (`shell:startup`). It runs the repo's `.venv\Scripts\pythonw.exe` if a venv exists, otherwise the `pythonw.exe` next to your Python, on `run_jarvis.pyw`, in the repo folder. Say "don't start with Windows" or run `uninstall_startup.py` to remove it.
+- **Notifications:** reminders and timers also show a Windows toast (`NOTIFY=true`), so you see them while you're muted or in a meeting.
+- **One copy only:** a named mutex stops a second Jarvis from starting. Launching it again, from the tray launcher or from `main.py`, wakes the one already running instead.
+- **Logs:** everything is written to `data\logs\jarvis.log`, rotating at 1 MB and keeping 5 old files. `main.py` also prints to the console; the tray app has no console, so check the log (tray menu > Open logs) if something seems wrong.
+
 ## What you can say
 
 📄 **Printable cheat sheet: [COMMANDS.md](COMMANDS.md).** Say "Jarvis, help" for the categories, or "help with WhatsApp" (or laptop, VS Code...) for examples from one category.
@@ -134,10 +149,21 @@ Reminders only fire while Jarvis is running.
 ## Architecture
 
 ```
-main.py                 entry point: flags, greeting, wake-word loop, strip_wake_word()
+main.py                 console entry point: flags, single-instance check, runs the Assistant
+run_jarvis.pyw          background entry point (no console): starts the tray app
+install_startup.py      add / remove the Startup-folder shortcut
+uninstall_startup.py
 config.py               every setting, read from .env with defaults
+jarvis/assistant.py     Assistant: the listening loop, wake word, wake()/sleep()/mute() controls
+jarvis/tray.py          pystray tray icon + menu; owns the main thread, voice loop on a background thread
+jarvis/hotkey.py        global hotkey (pynput)
+jarvis/notify.py        Windows toasts (win11toast, tray balloon fallback)
+jarvis/startup.py       Startup-folder shortcut logic
+jarvis/instance.py      single instance (named mutex) + "wake the running copy" signal
+jarvis/logs.py          rotating log file + console
 jarvis/voice.py         Voice: TTS on a worker thread (thread-safe speak), Google STT, text mode
 jarvis/router.py        @skill / @fallback registry, Context (say/ask/confirm), handle()
+jarvis/translit.py      Hindi (Devanagari) -> English command rewriting
 jarvis/http.py          shared requests.Session with timeouts: get_json / get_text / post_json
 jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_from_command()
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")

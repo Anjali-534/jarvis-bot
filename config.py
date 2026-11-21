@@ -77,3 +77,8 @@ PROJECT_ROOTS = [
     if p.strip()
 ]
 PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")
+
+# Background mode
+HOTKEY = _str("HOTKEY", "ctrl+alt+j")          # wakes Jarvis instantly; empty to disable
+NOTIFY = _bool("NOTIFY", True)                  # Windows toasts for reminders and timers
+LOG_DIR = _path("LOG_DIR", "data/logs")

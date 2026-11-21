@@ -459,11 +459,12 @@ def test_ai_prompt_asks_for_roman_hinglish(monkeypatch):
 
 
 # ---------------------------------------------------------------- help and language
-def test_short_help_prints_full_list(capsys):
+def test_short_help_prints_full_list(caplog):
+    caplog.set_level("INFO")
     ctx = make_ctx()
     assert handle(ctx, "help") == "help"
     assert ctx.voice.last == general.SHORT_HELP
-    printed = capsys.readouterr().out
+    printed = caplog.text
     for title in ("Air quality:", "WhatsApp:", "VS Code:", "Laptop controls:"):
         assert title in printed
     assert '"send a WhatsApp to mom saying I\'ll be late"' in printed

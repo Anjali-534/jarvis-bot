@@ -3,6 +3,7 @@
 Contacts live in data/contacts.json as {"mom": "919876543210"} (git-ignored).
 Every message is read back and confirmed before it is sent.
 """
+import logging
 import difflib
 import json
 import os
@@ -14,6 +15,8 @@ import webbrowser
 
 import config
 from jarvis.router import skill
+
+log = logging.getLogger(__name__)
 
 WA = r"whats\s?app"
 ADD_HOW = "Say add contact, then their name and number, or add them to data slash contacts dot json."
@@ -59,7 +62,7 @@ def load_contacts():
     try:
         data = json.loads(path.read_text(encoding="utf-8") or "{}")
     except json.JSONDecodeError:
-        print(f"[whatsapp] {path} is not valid JSON")
+        log.warning(f"[whatsapp] {path} is not valid JSON")
         return {}
     return {str(k).strip().lower(): str(v) for k, v in data.items() if str(k).strip()}
 

@@ -16,6 +16,20 @@ After Jarvis replies you have **20 seconds** to carry on without the wake word.
 
 **Stop:** "goodbye", "exit", "turn off Jarvis", or press **Ctrl+C**.
 
+## Running in the background
+
+| Command | What it does |
+|---|---|
+| Double-click `run_jarvis.pyw` (or `pythonw run_jarvis.pyw`) | Start Jarvis in the system tray, with no console window |
+| `python install_startup.py` / say "start with Windows" | Start Jarvis in the tray every time you log in |
+| `python uninstall_startup.py` / say "don't start with Windows" | Stop starting with Windows |
+| **Ctrl+Alt+J** | Wake Jarvis instantly. You'll hear a beep, then just say the command, with no wake word. |
+
+**Tray icon** (orange "J"): a green dot means listening, grey means sleeping, red means the mic is muted. Hover over it for the status.
+Right-click it for **Wake up, Sleep, Mute mic, Open COMMANDS.md, Open notes, Open logs, Restart Jarvis, Quit**.
+Reminders and timers also pop up a Windows notification, so you see them while you're muted or in a meeting.
+Starting Jarvis a second time doesn't open a second copy; it wakes the one already running.
+
 **Help:** "help" lists the categories; "help with WhatsApp", "help laptop" or "what can you do with VS Code" gives examples for one category.
 
 ---
@@ -52,6 +66,7 @@ Live Indian CPCB AQI for any area or pincode. Jarvis remembers your area for the
 - "Shut down the laptop" / "restart in 10 minutes" / "turn off my computer" (always asks first)
 - "Cancel shutdown"
 - "Put the laptop to sleep" (asks first)
+- "Start with Windows" / "don't start with Windows" (asks first)
 
 ## Web
 - "Play Arijit Singh songs" / "play lofi beats on YouTube"

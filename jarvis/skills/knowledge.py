@@ -1,9 +1,12 @@
 """Short Wikipedia answers. Returns None on any problem so the AI can answer instead."""
+import logging
 import re
 from urllib.parse import quote
 
 from jarvis import http
 from jarvis.router import skill
+
+log = logging.getLogger(__name__)
 
 OPENSEARCH_URL = "https://en.wikipedia.org/w/api.php"
 SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/"
@@ -37,5 +40,5 @@ def wikipedia(ctx, command, match):
     try:
         return wikipedia_summary(topic)
     except Exception as exc:
-        print(f"[wikipedia] {exc}")
+        log.info(f"[wikipedia] {exc}")
         return None
