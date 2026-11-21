@@ -56,5 +56,24 @@ AI_API_KEY = _str("AI_API_KEY") or _str("OPENAI_API_KEY")
 AI_BASE_URL = _str("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 AI_MODEL = _str("AI_MODEL", "gpt-4o-mini")
 
+def _float(name, default):
+    try:
+        return float(os.getenv(name, "").strip())
+    except ValueError:
+        return default
+
+
 NOTES_FILE = _path("NOTES_FILE", "data/notes.txt")
 SCREENSHOT_DIR = _path("SCREENSHOT_DIR", "~/Pictures/Jarvis Screenshots")
+
+# WhatsApp: contacts file and how long to wait for the chat to open before pressing Enter
+CONTACTS_FILE = _path("CONTACTS_FILE", "data/contacts.json")
+WHATSAPP_SEND_DELAY = _float("WHATSAPP_SEND_DELAY", 3.0)
+
+# VS Code: folders scanned for projects (separate several with ;) and manual aliases
+PROJECT_ROOTS = [
+    Path(os.path.expandvars(os.path.expanduser(p.strip())))
+    for p in _str("PROJECT_ROOTS", r"C:\Users\ADMIN\OneDrive\Desktop\ANJALI").split(";")
+    if p.strip()
+]
+PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")

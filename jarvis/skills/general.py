@@ -43,6 +43,8 @@ HELP_TEXT = (
     "Here's what I can do. Air quality: ask for the AQI, PM2.5, PM10 or NO2 anywhere in India, "
     "ask if it's safe to go out, or ask for today's red zones. Tell me your area or pincode and I'll remember it. "
     "Weather and rain forecasts. Open or close apps and websites, play songs on YouTube, search Google, read the news. "
+    "Send WhatsApp messages to your saved contacts. Open your projects in VS Code, check their git status, "
+    "pull the latest changes, or run them. "
     "Take notes, set reminders and timers. Control volume, brightness, media, screenshots, battery, lock, "
     "sleep, restart or shut down the laptop. Do maths, tell jokes, the time and date, "
     "and answer general questions. Say go to sleep to pause me, or goodbye to exit."

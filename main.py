@@ -21,6 +21,11 @@ def _wake_words():
     return sorted(words, key=len, reverse=True)
 
 
+# If a trailing "jarvis" follows one of these, it's part of the command (e.g. a project name).
+_DANGLING = re.compile(r"\b(?:of|in|for|on|to|at|about|from|with|into|called|named|open|run|start|pull|"
+                       r"launch|close|status|work on)$")
+
+
 def strip_wake_word(text, wake_words=None):
     """Return (woke, command). The wake word is stripped from the start, end or middle."""
     words = wake_words or _wake_words()
@@ -35,7 +40,10 @@ def strip_wake_word(text, wake_words=None):
             return True, lead.group(1).strip()
         trail = re.fullmatch(rf"(.*?)[\s,]*\b{w}[\s.!?]*", t)
         if trail:
-            return True, trail.group(1).strip()
+            before = trail.group(1).strip()
+            if _DANGLING.search(before):
+                return True, t  # "git status of jarvis": the name is the project, not the wake word
+            return True, before
     for word in words:
         middle = re.search(rf"\b{re.escape(word)}\b[\s,]*", t)
         if middle:

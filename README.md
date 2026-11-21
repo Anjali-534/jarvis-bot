@@ -23,6 +23,10 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 | `DEFAULT_LOCATION` | Used until you tell Jarvis your area. Defaults to New Delhi. |
 | `VOICE_NAME`, `VOICE_RATE` | Part of a Windows voice name (`zira`, `david`, `heera`...) and the speaking speed. |
 | `WAKE_WORDS`, `FOLLOW_UP_SECONDS` | The wake phrases, and how long you can keep talking without one after a reply. |
+| `WHATSAPP_SEND_DELAY` | Seconds to wait for WhatsApp to open a chat before pressing Enter (default 3). |
+| `PROJECT_ROOTS` | Folders to scan for code projects, separated by `;`. Defaults to `C:\Users\ADMIN\OneDrive\Desktop\ANJALI`. |
+
+For WhatsApp, copy `contacts.example.json` to `data\contacts.json` and add your contacts (country code plus number, digits only), or add them by voice. For extra project names, copy `projects.example.json` to `data\projects.json`. Everything in `data\` is git-ignored.
 
 If `pip install PyAudio` fails, update pip first (`python -m pip install -U pip`); PyAudio ships Windows wheels for recent Python versions.
 
@@ -63,6 +67,25 @@ With no microphone, Jarvis switches to text mode automatically. After it replies
 - "Open GitHub", "open gmail", "open github.com", "open example dot com"
 - Anything else is searched in the Start menu: "open Figma"
 - "Close Chrome", "quit Spotify", "close this window", "close tab"
+
+**WhatsApp** (WhatsApp Desktop, or WhatsApp Web if Desktop isn't installed)
+- "Send a WhatsApp to mom saying I'll be late"
+- "Message Dhruv on WhatsApp that the demo is at 5"
+- "WhatsApp mom" (asks what to say)
+- Jarvis always reads the message back and asks before sending: "Send 'I'll be late' to Mom?"
+- "Call mom on WhatsApp" opens the chat; you tap the call button yourself
+- "Add contact Riya 98765 43210" (asks first; 10-digit numbers get the 91 prefix)
+- Contact names are matched loosely, so "Druv" finds Dhruv.
+
+**VS Code and projects**
+- "Open bogie admin in VS Code", "open jarvis project", "work on bogie backend"
+- If several projects match, Jarvis lists up to 3 and asks which one ("the second one" or a name)
+- "Open VS Code here" / "new VS Code window"
+- "Open file router dot py in jarvis" (skips node_modules, .git, dist, build, .next and \_\_pycache\_\_)
+- "List my projects", "rescan projects"
+- "Git status of jarvis": branch, ahead/behind, and how many files changed (file names are never read out)
+- "Pull jarvis": asks first, then runs `git pull --ff-only`. Jarvis never pushes, commits or resets by voice.
+- "Run bogie backend" / "start the go api server": asks first, then opens a new terminal running `npm run dev`, `npm start`, `go run .` or `python main.py`
 
 **Web**
 - "Play Arijit Singh songs", "play lofi beats on YouTube"
@@ -106,17 +129,21 @@ jarvis/http.py          shared requests.Session with timeouts: get_json / get_te
 jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_from_command()
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")
 jarvis/skills/
-    __init__.py         imports skills IN ORDER: general, notes, system, web, apps, weather, aqi, knowledge, ai
+    __init__.py         imports skills IN ORDER: general, notes, system, web, whatsapp, vscode,
+                        apps, weather, aqi, knowledge, ai
     general.py          exit, sleep, help, greetings, time, date, calculator, jokes
     notes.py            notes file, reminders, timers
     system.py           volume, media, brightness, screenshot, battery, status, lock, power
     web.py              YouTube, Google, Google News
+    whatsapp.py         WhatsApp messages, calls, contacts (data/contacts.json)
+    vscode.py           project registry, open in VS Code, git status/pull, run dev servers
     apps.py             open / close apps and websites
     weather.py          Open-Meteo forecast
     aqi.py              CPCB AQI, pollutants, safety advice, red zones
     knowledge.py        Wikipedia summaries
     ai.py               OpenAI-compatible fallback with short conversation memory
-tests/test_jarvis.py    offline tests (fake voice, fake network)
+tests/                  offline tests: conftest.py blocks network and real apps;
+                        test_jarvis.py, test_whatsapp.py, test_vscode.py
 ```
 
 How a command is handled:
@@ -129,27 +156,21 @@ How a command is handled:
 
 ## Adding a skill
 
-Create `jarvis/skills/whatsapp.py`:
+`whatsapp.py` and `vscode.py` are complete examples. A minimal skill, `jarvis/skills/spotify.py`:
 
 ```python
 from jarvis.router import skill
 from jarvis.skills.apps import launch
 
 
-@skill("whatsapp message", r"\b(?:send|message)\s+(.+?)\s+on whatsapp\b", help="message Riya on WhatsApp")
-def whatsapp_message(ctx, command, match):
-    contact = match.group(1)
-    text = ctx.ask(f"What should I tell {contact}?")
-    if not text:
-        return "Okay, cancelled."
-    if not ctx.confirm(f"Send '{text}' to {contact}?"):
-        return "Okay, I didn't send it."
-    launch("whatsapp:")
-    # ... automate the send here ...
-    return f"Sent to {contact}."
+@skill("spotify playlist", r"\bplay (?:my )?(.+?) playlist on spotify$", help="play my workout playlist on spotify")
+def spotify_playlist(ctx, command, match):
+    name = match.group(1)
+    launch(f"spotify:search:{name}")
+    return f"Searching Spotify for your {name} playlist."
 ```
 
-Then add `whatsapp` to the import list in `jarvis/skills/__init__.py`, **before** `knowledge` and `ai`. Order matters, because the first matching skill wins. Add its phrases to the `ROUTES` table in `tests/test_jarvis.py`.
+Then add `spotify` to the import list in `jarvis/skills/__init__.py`. Order matters, because the first matching skill wins: put it **before** `web` here, or "play X on spotify" goes to YouTube. Integrations normally go before `apps`, and always before `knowledge` and `ai`. Add its phrases to the `ROUTES` table in `tests/test_jarvis.py`, and replace side effects (launching, keypresses, subprocess calls) with small module functions that `tests/conftest.py` can stub out.
 
 Some guidelines:
 - Use `ctx.say`, `ctx.ask` and `ctx.confirm` for conversation, and `ctx.state` for memory within a session.
@@ -167,8 +188,8 @@ Some guidelines:
 
 ## Roadmap
 
-- **WhatsApp:** send messages to saved contacts, read unread chats
-- **VS Code:** "open my jarvis project", recent projects, run tests or git status by voice
+- **WhatsApp:** read unread chats, send to groups
+- **VS Code:** recent projects, run tests by voice
 - **Spotify:** play playlists and liked songs through the Spotify API
 - **Calendar and email:** today's meetings, read and draft emails
 - **Hindi commands:** `SPEECH_LANGUAGE=hi-IN`, Hindi patterns and replies

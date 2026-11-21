@@ -1,62 +1,17 @@
-"""Offline tests: no network, no microphone, no real side effects."""
-import sys
+"""Core tests: no network, no microphone, no real side effects (see conftest.py)."""
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
+from helpers import FakeVoice, make_ctx
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-import config  # noqa: E402
-import jarvis.skills  # noqa: E402,F401
-from jarvis import geo, http, router  # noqa: E402
-from jarvis.geo import Place  # noqa: E402
-from jarvis.router import Context, handle  # noqa: E402
-from jarvis.skills import aqi, general, system  # noqa: E402
-from jarvis.timeparse import find_clock, parse_duration  # noqa: E402
-from main import run, strip_wake_word  # noqa: E402
-
-
-class FakeVoice:
-    text_mode = False
-
-    def __init__(self, answers=None, stop_when_empty=False):
-        self.said = []
-        self.answers = list(answers or [])
-        self.stop_when_empty = stop_when_empty  # main-loop tests: Ctrl+C instead of looping forever
-
-    def speak(self, text, wait=True):
-        self.said.append(text)
-
-    def listen(self, timeout=8, phrase_time_limit=12):
-        if not self.answers and self.stop_when_empty:
-            raise KeyboardInterrupt
-        return self.answers.pop(0) if self.answers else ""
-
-    @property
-    def last(self):
-        return self.said[-1] if self.said else ""
-
-
-@pytest.fixture(autouse=True)
-def offline(monkeypatch):
-    """Fail loudly if anything tries to use the real network."""
-
-    def no_network(*args, **kwargs):
-        raise AssertionError(f"unexpected network call: {args[:1]}")
-
-    monkeypatch.setattr(http, "get_json", no_network)
-    monkeypatch.setattr(http, "get_text", no_network)
-    monkeypatch.setattr(http, "post_json", no_network)
-    monkeypatch.setattr(config, "USER_NAME", "Anjali")
-    monkeypatch.setattr(config, "WAQI_TOKEN", "")
-    monkeypatch.setattr(config, "RED_ZONE_THRESHOLD", 200)
-    geo._CACHE.clear()
-
-
-def make_ctx(answers=None):
-    return Context(FakeVoice(answers))
+import config
+from jarvis import geo, http, router
+from jarvis.geo import Place
+from jarvis.router import handle
+from jarvis.skills import aqi, general, system
+from jarvis.timeparse import find_clock, parse_duration
+from main import run, strip_wake_word
 
 
 # ---------------------------------------------------------------- routing table
@@ -99,6 +54,18 @@ ROUTES = [
     ("what's the weather", "weather"), ("weather in mumbai tomorrow", "weather"), ("will it rain today", "rain"),
     ("do i need an umbrella", "rain"), ("who is sachin tendulkar", "wikipedia"), ("tell me about the taj mahal", "wikipedia"),
     ("write a poem about rain", "ai"), ("forget our conversation", "forget conversation"),
+    # whatsapp
+    ("send a whatsapp to mom saying i'll be late", "whatsapp message"),
+    ("message dhruv on whatsapp that the demo is at 5", "whatsapp message"), ("whatsapp mom", "whatsapp message"),
+    ("call mom on whatsapp", "whatsapp call"), ("add contact riya 9876543210", "whatsapp add contact"),
+    ("open whatsapp", "open"),
+    # vs code
+    ("open bogie in vs code", "vscode open project"), ("open bogie project", "vscode open project"),
+    ("work on jarvis", "vscode open project"), ("open vs code here", "vscode new window"),
+    ("new vs code window", "vscode new window"), ("open file main.py in jarvis", "vscode open file"),
+    ("list my projects", "vscode list projects"), ("rescan projects", "vscode rescan"),
+    ("git status of jarvis", "git status"), ("pull jarvis", "git pull"), ("run bogie backend", "run project"),
+    ("open vs code", "open"),
 ]
 
 PURE_SKILLS = {"calculator"}  # real handlers that may return None to fall through
@@ -136,6 +103,11 @@ def test_skill_order_cancel_shutdown_before_power():
     ("bye jarvis", (True, "exit")),
     ("shut down jarvis", (True, "exit")),
     ("what's the aqi", (False, "what's the aqi")),
+    # "jarvis" is also a project name: keep it when it's the object of the command
+    ("git status of jarvis", (True, "git status of jarvis")),
+    ("jarvis open file main.py in jarvis", (True, "open file main.py in jarvis")),
+    ("pull jarvis", (True, "pull jarvis")),
+    ("close jarvis", (True, "exit")),
 ])
 def test_strip_wake_word(text, expected):
     assert strip_wake_word(text, ["hey jarvis", "ok jarvis", "okay jarvis", "jarvis"]) == expected
