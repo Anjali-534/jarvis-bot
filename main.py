@@ -1,63 +1,107 @@
-import speech_recognition as sr
-import pyttsx3
+"""Jarvis entry point: wake-word loop around the skill router.
 
-# Initialize TTS engine
-engine = pyttsx3.init()
-engine.setProperty('rate', 150)
-engine.setProperty('volume', 1.0)
-voices = engine.getProperty('voices')
-engine.setProperty('voice', voices[1].id)  # female voice
+    python main.py            voice mode with wake word
+    python main.py --no-wake  voice mode, every phrase is a command
+    python main.py --text     type instead of talking (wake word off)
+    python main.py --mute     print replies instead of speaking them
+"""
+import argparse
+import re
+import time
 
-def speak(text):
-    print(f"Bot: {text}")
-    engine.say(text)
-    engine.runAndWait()
+import config
+import jarvis.skills  # noqa: F401  (registers all skills)
+from jarvis.router import Context, handle
+from jarvis.skills.general import time_of_day
 
-def listen():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Listening...")
-        recognizer.adjust_for_ambient_noise(source)
-        audio = recognizer.listen(source)
+
+def _wake_words():
+    words = set(config.WAKE_WORDS)
+    words |= {w.replace("ok ", "okay ") for w in words if w.startswith("ok ")}
+    return sorted(words, key=len, reverse=True)
+
+
+def strip_wake_word(text, wake_words=None):
+    """Return (woke, command). The wake word is stripped from the start, end or middle."""
+    words = wake_words or _wake_words()
+    t = re.sub(r"\s+", " ", (text or "").lower()).strip()
+    alternatives = "|".join(re.escape(w) for w in words)
+    if re.fullmatch(rf"(?:please\s+)?(?:turn off|shut ?down|stop|close|bye|goodbye|good bye|exit|quit)[\s,]+(?:{alternatives})[.!]?", t):
+        return True, "exit"
+    for word in words:
+        w = re.escape(word)
+        lead = re.fullmatch(rf"{w}\b[\s,.!?]*(.*)", t)
+        if lead:
+            return True, lead.group(1).strip()
+        trail = re.fullmatch(rf"(.*?)[\s,]*\b{w}[\s.!?]*", t)
+        if trail:
+            return True, trail.group(1).strip()
+    for word in words:
+        middle = re.search(rf"\b{re.escape(word)}\b[\s,]*", t)
+        if middle:
+            after = t[middle.end():].strip()
+            return True, after or t[:middle.start()].strip(" ,")
+    return False, t
+
+
+def run(text_mode=False, wake_enabled=True, mute=False, voice=None):
+    if voice is None:
+        from jarvis.voice import Voice
+
+        voice = Voice(text_mode=text_mode, mute=mute)
+    if getattr(voice, "text_mode", False):
+        wake_enabled = False  # typing "jarvis" every time is pointless
+    ctx = Context(voice)
+    ctx.say(f"Good {time_of_day()}, {config.USER_NAME}. {config.ASSISTANT_NAME} is online.")
+    if wake_enabled:
+        print(f"(Say '{config.WAKE_WORDS[0]}' followed by a command. Say 'help' to hear what I can do.)")
+    last_reply = time.monotonic()
+    misses = 0
     try:
-        command = recognizer.recognize_google(audio)
-        print(f"You said: {command}")
-        return command.lower()
-    except sr.UnknownValueError:
-        speak("Sorry, I didn't catch that. Please say it again.")
-        return ""
-    except sr.RequestError:
-        speak("Speech service is down.")
-        return ""
+        while ctx.running:
+            heard = voice.listen()
+            if not heard:
+                if not wake_enabled and not ctx.sleeping:
+                    misses += 1
+                    if misses >= 2:
+                        ctx.say("Sorry, I didn't catch that.")
+                        misses = 0
+                continue
+            misses = 0
+            woke, command = strip_wake_word(heard)
+            if ctx.sleeping:
+                if not woke:
+                    continue
+                ctx.sleeping = False
+                if not command:
+                    ctx.say("I'm back. Yes?")
+                    last_reply = time.monotonic()
+                    continue
+            elif wake_enabled and not woke and time.monotonic() - last_reply > config.FOLLOW_UP_SECONDS:
+                continue
+            if not command:
+                ctx.say("Yes?")
+            else:
+                handle(ctx, command)
+            last_reply = time.monotonic()
+    except KeyboardInterrupt:
+        print()
+        ctx.say(f"Goodbye, {config.USER_NAME}.")
+    finally:
+        close = getattr(voice, "close", None)
+        if close:
+            close()
+    return ctx
 
-def run_bot():
-    speak("Hey! I am here to give you AQI and pollution info.")
-    speak("Please tell me your area or pincode.")
 
-    while True:
-        command = listen()
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=f"{config.ASSISTANT_NAME} personal voice assistant")
+    parser.add_argument("--text", action="store_true", help="type commands instead of speaking")
+    parser.add_argument("--no-wake", action="store_true", help="don't require the wake word")
+    parser.add_argument("--mute", action="store_true", help="print replies instead of speaking them")
+    args = parser.parse_args(argv)
+    run(text_mode=args.text, wake_enabled=config.WAKE_WORD_ENABLED and not args.no_wake, mute=args.mute)
 
-        if 'pm2.5' in command:
-            speak("The PM2.5 in your area is XX micrograms per cubic meter, AQI Zone: Green, Yellow, or Red")
-
-        elif 'no2' in command:
-            speak("The NO2 in your area is XX micrograms per cubic meter, AQI Zone: Green, Yellow, or Red")
-
-        elif 'safe' in command or 'pollution safe' in command:
-            speak("Today's AQI in your area is Green, Yellow, or Red. Advice: Stay indoors, Mask recommended, or Safe")
-
-        elif 'red zones' in command:
-            speak("Today's Red AQI zones are: Area1, Area2, Area3")
-
-        elif 'help' in command:
-            speak("You can say: PM2.5, NO2, Safe, Red Zones, or Help")
-
-        elif 'exit' in command or 'quit' in command:
-            speak("Goodbye! Stay safe!")
-            break
-
-        else:
-            speak("Sorry, I didn't get your location. Please say your area or pincode again.")
 
 if __name__ == "__main__":
-    run_bot()
+    main()

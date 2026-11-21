@@ -1,0 +1,8 @@
+SpeechRecognition
+PyAudio
+pyttsx3
+requests
+python-dotenv
+psutil
+pyautogui
+pyjokes

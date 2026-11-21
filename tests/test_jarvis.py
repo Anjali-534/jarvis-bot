@@ -1,0 +1,489 @@
+"""Offline tests: no network, no microphone, no real side effects."""
+import sys
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import config  # noqa: E402
+import jarvis.skills  # noqa: E402,F401
+from jarvis import geo, http, router  # noqa: E402
+from jarvis.geo import Place  # noqa: E402
+from jarvis.router import Context, handle  # noqa: E402
+from jarvis.skills import aqi, general, system  # noqa: E402
+from jarvis.timeparse import find_clock, parse_duration  # noqa: E402
+from main import run, strip_wake_word  # noqa: E402
+
+
+class FakeVoice:
+    text_mode = False
+
+    def __init__(self, answers=None, stop_when_empty=False):
+        self.said = []
+        self.answers = list(answers or [])
+        self.stop_when_empty = stop_when_empty  # main-loop tests: Ctrl+C instead of looping forever
+
+    def speak(self, text, wait=True):
+        self.said.append(text)
+
+    def listen(self, timeout=8, phrase_time_limit=12):
+        if not self.answers and self.stop_when_empty:
+            raise KeyboardInterrupt
+        return self.answers.pop(0) if self.answers else ""
+
+    @property
+    def last(self):
+        return self.said[-1] if self.said else ""
+
+
+@pytest.fixture(autouse=True)
+def offline(monkeypatch):
+    """Fail loudly if anything tries to use the real network."""
+
+    def no_network(*args, **kwargs):
+        raise AssertionError(f"unexpected network call: {args[:1]}")
+
+    monkeypatch.setattr(http, "get_json", no_network)
+    monkeypatch.setattr(http, "get_text", no_network)
+    monkeypatch.setattr(http, "post_json", no_network)
+    monkeypatch.setattr(config, "USER_NAME", "Anjali")
+    monkeypatch.setattr(config, "WAQI_TOKEN", "")
+    monkeypatch.setattr(config, "RED_ZONE_THRESHOLD", 200)
+    geo._CACHE.clear()
+
+
+def make_ctx(answers=None):
+    return Context(FakeVoice(answers))
+
+
+# ---------------------------------------------------------------- routing table
+ROUTES = [
+    # AQI and its speech-recognition variants
+    ("what's the aqi", "aqi"), ("aqi in rohini", "aqi"), ("a q i", "aqi"), ("air quality of delhi", "aqi"),
+    ("how bad is the pollution today", "aqi"), ("is there smog", "aqi"), ("hello what's the aqi", "aqi"),
+    ("pm2.5", "pm2.5"), ("pm 2.5 in dwarka", "pm2.5"), ("pm2 point 5", "pm2.5"), ("what is the pm 25 level", "pm2.5"),
+    ("pm10", "pm10"), ("pm 10 in noida", "pm10"),
+    ("no2", "no2"), ("no 2 level", "no2"), ("n o 2", "no2"), ("nitrogen dioxide in gurugram", "no2"),
+    ("safe", "safe outside"), ("is it safe to go out", "safe outside"), ("pollution safe", "safe outside"),
+    ("do i need a mask", "safe outside"), ("is it safe for a morning walk", "safe outside"),
+    ("is it safe to eat street food", "ai"), ("is it safe to download this file", "ai"),
+    ("red zones", "red zones"), ("which are the most polluted areas", "red zones"),
+    ("my area is rohini", "set location"), ("i live in dwarka sector 10", "set location"), ("110085", "set location"),
+    # tricky ones
+    ("quit chrome", "close"), ("close vs code", "close"), ("search pollution in delhi", "google"),
+    ("cancel shutdown", "cancel shutdown"), ("turn off the lights", "ai"), ("what is python", "wikipedia"),
+    # general
+    ("exit", "exit"), ("goodbye", "exit"), ("bye jarvis", "exit"), ("go to sleep", "sleep"), ("help", "help"),
+    ("what can you do", "help"), ("hello", "greet"), ("who are you", "who are you"), ("how are you", "how are you"),
+    ("thank you", "thanks"), ("what time is it", "time"), ("what's the date today", "date"),
+    ("what is 5 plus 3", "calculator"), ("tell me a joke", "joke"),
+    # notes / reminders
+    ("take a note buy milk", "take note"), ("remember that the meeting is at 5", "take note"),
+    ("read my notes", "read notes"), ("clear my notes", "clear notes"),
+    ("remind me in 10 minutes to drink water", "reminder"), ("set a timer for 5 minutes", "timer"),
+    ("what are my reminders", "list reminders"), ("cancel my reminders", "cancel reminders"),
+    # system
+    ("volume up", "volume up"), ("turn down the volume", "volume down"), ("mute", "mute"),
+    ("pause the music", "play pause"), ("next song", "next track"), ("brightness 70", "brightness"),
+    ("take a screenshot", "screenshot"), ("battery status", "battery"), ("system status", "system status"),
+    ("lock the laptop", "lock"), ("shut down the laptop", "power"), ("restart in 5 minutes", "power"),
+    ("turn off my computer", "power"), ("put the laptop to sleep", "sleep pc"),
+    # web / apps
+    ("play believer on youtube", "play youtube"), ("search lofi music on youtube", "youtube search"),
+    ("google weather in mumbai", "google"), ("news", "news"), ("news about cricket", "news"),
+    ("open chrome and notepad", "open"), ("open github.com", "open"),
+    # weather / knowledge / ai
+    ("what's the weather", "weather"), ("weather in mumbai tomorrow", "weather"), ("will it rain today", "rain"),
+    ("do i need an umbrella", "rain"), ("who is sachin tendulkar", "wikipedia"), ("tell me about the taj mahal", "wikipedia"),
+    ("write a poem about rain", "ai"), ("forget our conversation", "forget conversation"),
+]
+
+PURE_SKILLS = {"calculator"}  # real handlers that may return None to fall through
+
+
+@pytest.fixture
+def recorded_skills(monkeypatch):
+    for sk in router.SKILLS:
+        if sk.name not in PURE_SKILLS:
+            monkeypatch.setattr(sk, "handler", lambda ctx, cmd, m, name=sk.name: f"<{name}>")
+    monkeypatch.setattr(router.FALLBACK, "handler", lambda ctx, cmd, m: "<ai>")
+    monkeypatch.setattr(router.FALLBACK, "name", "ai")
+
+
+@pytest.mark.parametrize("phrase, expected", ROUTES)
+def test_routing(recorded_skills, phrase, expected):
+    assert handle(make_ctx(), phrase) == expected
+
+
+def test_skill_order_cancel_shutdown_before_power():
+    names = [s.name for s in router.SKILLS]
+    assert names.index("cancel shutdown") < names.index("power")
+    assert names.index("google") < names.index("aqi")
+
+
+# ---------------------------------------------------------------- wake word and locations
+@pytest.mark.parametrize("text, expected", [
+    ("jarvis what's the aqi", (True, "what's the aqi")),
+    ("hey jarvis, open chrome", (True, "open chrome")),
+    ("okay jarvis what time is it", (True, "what time is it")),
+    ("what's the weather jarvis", (True, "what's the weather")),
+    ("jarvis", (True, "")),
+    ("so jarvis tell me a joke", (True, "tell me a joke")),
+    ("turn off jarvis", (True, "exit")),
+    ("bye jarvis", (True, "exit")),
+    ("shut down jarvis", (True, "exit")),
+    ("what's the aqi", (False, "what's the aqi")),
+])
+def test_strip_wake_word(text, expected):
+    assert strip_wake_word(text, ["hey jarvis", "ok jarvis", "okay jarvis", "jarvis"]) == expected
+
+
+@pytest.mark.parametrize("command, expected", [
+    ("pm2.5 in rohini sector 7", "rohini sector 7"),
+    ("what's the aqi in dwarka today", "dwarka"),
+    ("aqi of noida", "noida"),
+    ("aqi 110085", "110085"),
+    ("pincode 110 085", "110085"),
+    ("aqi in my area", None),
+    ("is it safe to go out here", None),
+    ("is it safe for a morning walk", None),
+    ("pm10 today", None),
+    ("what's the air quality", None),
+])
+def test_location_from_command(command, expected):
+    assert geo.location_from_command(command) == expected
+
+
+# ---------------------------------------------------------------- CPCB maths
+@pytest.mark.parametrize("pollutant, conc, index", [
+    ("pm2_5", 0, 0), ("pm2_5", 15, 25), ("pm2_5", 30, 50), ("pm2_5", 45, 75), ("pm2_5", 60, 100),
+    ("pm2_5", 90, 200), ("pm2_5", 105, 250), ("pm2_5", 250, 400), ("pm2_5", 2000, 500),
+    ("pm10", 50, 50), ("pm10", 175, 150), ("pm10", 350, 300), ("pm10", 430, 400),
+    ("nitrogen_dioxide", 40, 50), ("nitrogen_dioxide", 130, 150), ("nitrogen_dioxide", 400, 400),
+])
+def test_sub_index(pollutant, conc, index):
+    assert aqi.sub_index(pollutant, conc) == index
+
+
+@pytest.mark.parametrize("value, name, zone", [
+    (30, "Good", "Green"), (50, "Good", "Green"), (51, "Satisfactory", "Green"), (100, "Satisfactory", "Green"),
+    (150, "Moderate", "Yellow"), (200, "Moderate", "Yellow"), (201, "Poor", "Red"), (350, "Very Poor", "Red"),
+    (450, "Severe", "Red"),
+])
+def test_categories(value, name, zone):
+    assert aqi.category(value)[0] == name
+    assert aqi.zone(value) == zone
+
+
+# ---------------------------------------------------------------- AQI end to end
+def open_meteo_item(pm25, pm10=60.0, no2=20.0, current_pm25=None):
+    start = datetime(2026, 11, 20, 0, 0)
+    times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(48)]
+    # 24 hours before "now" use the given value; far-past and future hours are junk that must be ignored
+    now_index = 34
+    series = [999.0 if (i <= now_index - 24 or i > now_index) else pm25 for i in range(48)]
+    return {
+        "current": {"time": times[now_index], "pm2_5": current_pm25 or pm25, "pm10": pm10, "nitrogen_dioxide": no2},
+        "hourly": {"time": times, "pm2_5": series, "pm10": [pm10] * 48, "nitrogen_dioxide": [no2] * 48},
+    }
+
+
+def fake_air(values):
+    calls = []
+
+    def get_json(url, params=None, **kwargs):
+        calls.append((url, params))
+        assert url == aqi.AIR_URL
+        count = len(params["latitude"].split(","))
+        items = [open_meteo_item(values[i % len(values)]) for i in range(count)]
+        return items if count > 1 else items[0]
+
+    return get_json, calls
+
+
+def test_aqi_end_to_end(monkeypatch):
+    get_json, calls = fake_air([100.0])
+    monkeypatch.setattr(http, "get_json", get_json)
+    ctx = make_ctx()
+    ctx.state["location"] = Place("Rohini", 28.74, 77.08)
+    assert handle(ctx, "what's the aqi") == "aqi"
+    reply = ctx.voice.last
+    assert "Rohini" in reply and "233" in reply and "Poor" in reply and "red zone" in reply
+    assert "PM2.5" in reply and "N95" in reply
+    params = calls[0][1]
+    assert params["past_days"] == 1 and params["timezone"] == "auto" and "pm2_5" in params["hourly"]
+
+
+def test_pm25_reply_has_current_and_average(monkeypatch):
+    def get_json(url, params=None, **kwargs):
+        return open_meteo_item(40.0, current_pm25=55.0)
+
+    monkeypatch.setattr(http, "get_json", get_json)
+    ctx = make_ctx()
+    ctx.state["location"] = Place("Dwarka", 28.59, 77.04)
+    handle(ctx, "pm 2.5")
+    assert ctx.voice.last == ("In Dwarka, PM2.5 is 55 micrograms per cubic metre right now, "
+                              "with a 24-hour average of 40. That's a green zone.")
+
+
+def test_set_location_geocodes_and_remembers(monkeypatch):
+    def get_json(url, params=None, **kwargs):
+        if url == geo.NOMINATIM_URL:
+            assert params["postalcode"] == "110085" and params["country"] == "India"
+            return [{"lat": "28.71", "lon": "77.11", "display_name": "110085, Rohini, Delhi, India"}]
+        return open_meteo_item(50.0)
+
+    monkeypatch.setattr(http, "get_json", get_json)
+    ctx = make_ctx()
+    assert handle(ctx, "110085") == "set location"
+    assert ctx.state["location"].name == "Rohini"
+    assert "Rohini, pincode 110085," in ctx.voice.last and "Satisfactory" in ctx.voice.last
+
+
+def test_bom_from_piped_input_is_ignored(recorded_skills):
+    assert handle(make_ctx(), "﻿hello") == "greet"
+
+
+def test_safe_outside_advice(monkeypatch):
+    monkeypatch.setattr(http, "get_json", lambda url, params=None, **k: open_meteo_item(20.0, pm10=30.0))
+    ctx = make_ctx()
+    ctx.state["location"] = Place("Noida", 28.53, 77.39)
+    handle(ctx, "is it safe to go out")
+    assert "Good" in ctx.voice.last and "safe to go out" in ctx.voice.last
+
+
+def test_red_zones_open_meteo(monkeypatch):
+    values = [100.0, 150.0, 40.0, 200.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0]
+    get_json, calls = fake_air(values)
+    monkeypatch.setattr(http, "get_json", get_json)
+    ctx = make_ctx()
+    handle(ctx, "red zones")
+    assert len(calls) == 1  # all 10 NCR points in one request
+    assert len(calls[0][1]["latitude"].split(",")) == 10
+    reply = ctx.voice.last
+    assert reply.index("Anand Vihar") < reply.index("Rohini") < reply.index("Central Delhi")
+    assert "Dwarka" not in reply
+
+
+def test_red_zones_none_red_names_worst(monkeypatch):
+    get_json, _ = fake_air([20.0, 50.0, 20.0])
+    monkeypatch.setattr(http, "get_json", get_json)
+    ctx = make_ctx()
+    handle(ctx, "red zones")
+    assert "None of" in ctx.voice.last and "Rohini" in ctx.voice.last
+
+
+def test_red_zones_waqi(monkeypatch):
+    monkeypatch.setattr(config, "WAQI_TOKEN", "test-token")
+
+    def get_json(url, params=None, **kwargs):
+        assert url == aqi.WAQI_BOUNDS_URL and params["token"] == "test-token"
+        lat1, lon1, lat2, lon2 = map(float, params["latlng"].split(","))
+        assert round(lat2 - lat1, 2) == 0.7 and round(lon2 - lon1, 2) == 0.7
+        return {"status": "ok", "data": [
+            {"aqi": "-", "station": {"name": "Broken, Delhi"}},
+            {"aqi": "250", "station": {"name": "Rohini, Delhi, Delhi, India"}},
+            {"aqi": "180", "station": {"name": "Lodhi Road, Delhi"}},
+            {"aqi": "390", "station": {"name": "Anand Vihar, Delhi - DPCC"}},
+        ]}
+
+    monkeypatch.setattr(http, "get_json", get_json)
+    ctx = make_ctx()
+    ctx.state["location"] = Place("New Delhi", 28.61, 77.21)
+    handle(ctx, "red zones")
+    reply = ctx.voice.last
+    assert "Anand Vihar 390, Rohini 250" in reply
+    assert "Lodhi" not in reply and "Broken" not in reply
+
+
+def test_network_error_is_spoken_not_raised(monkeypatch):
+    import requests
+
+    def boom(*args, **kwargs):
+        raise requests.ConnectionError("offline")
+
+    monkeypatch.setattr(http, "get_json", boom)
+    ctx = make_ctx()
+    ctx.state["location"] = Place("Rohini", 28.74, 77.08)
+    handle(ctx, "aqi")
+    assert "couldn't reach the online service" in ctx.voice.last
+
+
+# ---------------------------------------------------------------- calculator
+@pytest.mark.parametrize("phrase, answer", [
+    ("what is 25 times 4", "100"), ("calculate 10 plus 5 minus 3", "12"), ("what is 100 divided by 8", "12.5"),
+    ("what is 10 percent of 250", "25"), ("what is the square root of 144", "12"), ("what is 2 to the power of 10", "1,024"),
+    ("what's 12 squared", "144"), ("what is 7 into 6", "42"),
+])
+def test_calculator(phrase, answer):
+    ctx = make_ctx()
+    assert handle(ctx, phrase) == "calculator"
+    assert ctx.voice.last.endswith(f" is {answer}.")
+
+
+def test_calculator_rejects_huge_exponent():
+    ctx = make_ctx()
+    handle(ctx, "what is 2 to the power of 1000000")
+    assert "too big" in ctx.voice.last
+
+
+def test_calculator_divide_by_zero():
+    ctx = make_ctx()
+    handle(ctx, "what is 5 divided by 0")
+    assert "divide by zero" in ctx.voice.last
+
+
+def test_safe_eval_rejects_code():
+    with pytest.raises(ValueError):
+        general.safe_eval("__import__('os').system('echo hi')")
+    assert general.to_expression("python") is None
+
+
+# ---------------------------------------------------------------- time parsing and reminders
+@pytest.mark.parametrize("text, seconds", [
+    ("in 10 minutes", 600), ("in an hour and 30 minutes", 5400), ("in half an hour", 1800),
+    ("in an hour and a half", 5400), ("after 2 hours", 7200), ("in 45 seconds", 45), ("for five minutes", 300),
+    ("to call mom", None),
+])
+def test_parse_duration(text, seconds):
+    assert parse_duration(text) == seconds
+
+
+def test_parse_clock_rolls_over():
+    morning = datetime(2026, 11, 21, 10, 0)
+    assert find_clock("at 6 pm", morning)[0] == datetime(2026, 11, 21, 18, 0)
+    assert find_clock("at 6", morning)[0] == datetime(2026, 11, 21, 18, 0)
+    assert find_clock("at 9:30 am", morning)[0] == datetime(2026, 11, 22, 9, 30)
+    evening = datetime(2026, 11, 21, 19, 0)
+    assert find_clock("at 6 pm", evening)[0] == datetime(2026, 11, 22, 18, 0)
+
+
+def test_reminder_fires():
+    ctx = make_ctx()
+    handle(ctx, "remind me in 1 second to stretch")
+    assert "stretch" in ctx.voice.last
+    deadline = time.time() + 4
+    while time.time() < deadline and "Reminder, Anjali: stretch" not in ctx.voice.said:
+        time.sleep(0.05)
+    assert "Reminder, Anjali: stretch" in ctx.voice.said
+    assert ctx.state["reminders"] == []
+
+
+def test_reminder_asks_when_and_cancel():
+    ctx = make_ctx(["10 minutes"])
+    handle(ctx, "remind me to drink water")
+    assert ctx.voice.said[-2] == "When should I remind you?"
+    assert "drink water" in ctx.voice.last and "10 minutes" in ctx.voice.last
+    handle(ctx, "cancel my reminders")
+    assert ctx.voice.last == "Cancelled 1 reminder."
+
+
+# ---------------------------------------------------------------- notes
+def test_notes(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "NOTES_FILE", tmp_path / "data" / "notes.txt")
+    ctx = make_ctx()
+    handle(ctx, "read my notes")
+    assert "don't have any notes" in ctx.voice.last
+    handle(ctx, "take a note buy milk")
+    assert ctx.voice.last == "Noted: buy milk."
+    handle(ctx, "read my notes")
+    assert ctx.voice.last == "You have 1 note: buy milk."
+    handle(ctx, "remember that the meeting is at 5")
+    handle(ctx, "read my notes")
+    assert ctx.voice.last.startswith("You have 2 notes.") and "1: the meeting is at 5" in ctx.voice.last
+    ctx.voice.answers = ["call the bank"]
+    handle(ctx, "take a note")
+    assert ctx.voice.last == "Noted: call the bank."
+    ctx.voice.answers = ["yes"]
+    handle(ctx, "clear my notes")
+    assert ctx.voice.last == "Done. I deleted 3 notes."
+
+
+# ---------------------------------------------------------------- system safety, AI, exit
+def test_shutdown_refused_when_answer_is_no(monkeypatch):
+    monkeypatch.setattr(system, "IS_WINDOWS", True)
+    ran = []
+    monkeypatch.setattr(system, "run", lambda *a, **k: ran.append(a))
+    ctx = make_ctx(["no"])
+    handle(ctx, "shut down the laptop")
+    assert "Are you sure" in ctx.voice.said[0]
+    assert ctx.voice.last == "Okay, I won't shut down the laptop."
+    assert ran == []
+
+
+def test_shutdown_confirmed_uses_delay(monkeypatch):
+    monkeypatch.setattr(system, "IS_WINDOWS", True)
+    ran = []
+
+    class Done:
+        returncode = 0
+
+    monkeypatch.setattr(system, "run", lambda args, **k: ran.append(args) or Done())
+    ctx = make_ctx(["yes"])
+    handle(ctx, "restart the laptop in 5 minutes")
+    assert ran == [["shutdown", "/r", "/t", "300"]]
+
+
+def test_ai_without_key(monkeypatch):
+    monkeypatch.setattr(config, "AI_API_KEY", "")
+    ctx = make_ctx()
+    assert handle(ctx, "turn off the lights") == "ai"
+    assert "AI_API_KEY" in ctx.voice.last
+
+
+def test_ai_with_key_keeps_history(monkeypatch):
+    monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"content": "**Sure!** Here's a `tip`."}}]}
+
+    sent = []
+    monkeypatch.setattr(http, "post_json", lambda url, payload, **k: sent.append(payload) or Response())
+    ctx = make_ctx()
+    handle(ctx, "give me a study tip")
+    assert ctx.voice.last == "Sure! Here's a tip."
+    assert len(ctx.state["ai_history"]) == 2 and sent[0]["max_tokens"] == 300
+    handle(ctx, "forget our conversation")
+    assert ctx.state["ai_history"] == []
+
+
+def test_ai_rejected_key(monkeypatch):
+    monkeypatch.setattr(config, "AI_API_KEY", "sk-bad")
+
+    class Response:
+        status_code = 401
+
+    monkeypatch.setattr(http, "post_json", lambda *a, **k: Response())
+    ctx = make_ctx()
+    handle(ctx, "tell me something interesting")
+    assert "rejected" in ctx.voice.last
+
+
+def test_exit_stops():
+    ctx = make_ctx()
+    assert handle(ctx, "exit") == "exit"
+    assert ctx.running is False
+
+
+def test_main_loop_with_wake_word(monkeypatch):
+    monkeypatch.setattr(config, "FOLLOW_UP_SECONDS", 0)
+    voice = FakeVoice(["what time is it", "jarvis", "jarvis what is 2 plus 2", "", "bye jarvis"], stop_when_empty=True)
+    ctx = run(wake_enabled=True, voice=voice)
+    assert "is online" in voice.said[0]
+    assert "Yes?" in voice.said
+    assert "2 plus 2 is 4." in voice.said
+    assert not any(s.startswith("It's ") for s in voice.said)  # ignored: no wake word
+    assert ctx.running is False
+
+
+def test_main_loop_no_wake_misses():
+    voice = FakeVoice(["", "", "exit"], stop_when_empty=True)
+    run(wake_enabled=False, voice=voice)
+    assert "Sorry, I didn't catch that." in voice.said
