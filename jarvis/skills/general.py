@@ -178,7 +178,17 @@ def ai_model(ctx, command, match):
 
     if not config.AI_API_KEY:
         return "No AI is set up yet. Add an AI_API_KEY to the .env file."
-    return f"I'm using {ai.provider_name()}, with the model {ai.spoken_model()}."
+    main = f"{ai.provider_name()}, with the model {ai.spoken_model()}"
+    if not ai.has_backup():
+        return f"I'm using {main}."
+    backup = f"Google Gemini, {ai.spoken_model(config.GEMINI_MODEL)}"
+    if ai.backup_until():
+        return (f"I'm on my backup brain, {backup}, because {ai.provider_name()}'s daily limit is used up. "
+                f"I'll go back to {ai.provider_name()} at midnight.")
+    if ai._on_backup:
+        return (f"I'm on my backup brain, {backup}, because {ai.provider_name()} didn't answer last time. "
+                f"My main AI is {main}.")
+    return f"I'm using {main}. My backup is {backup}, and it isn't in use right now."
 
 
 # ---------------------------------------------------------------- small talk

@@ -9,6 +9,7 @@ A skill is a function ``handler(ctx, command, match)`` registered with ``@skill`
 import logging
 import re
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -192,8 +193,25 @@ def speak_list(ctx, intro, items, join=join_and, end=".", chunk=LIST_CHUNK, prin
             return ""
 
 
-def _run(ctx, sk, command, match):
+@contextmanager
+def one_sec(ctx):
+    """Say "One sec." if nothing has been said ONE_SEC_AFTER seconds into the block."""
     timer = _start_one_sec(ctx)
+    try:
+        yield
+    finally:
+        if timer is not None:
+            timer.cancel()
+            if ctx._one_sec is timer:
+                ctx._one_sec = None
+
+
+def _run(ctx, sk, command, match):
+    with one_sec(ctx):
+        return _run_handler(ctx, sk, command, match)
+
+
+def _run_handler(ctx, sk, command, match):
     try:
         return sk.handler(ctx, command, match)
     except SpokenError as exc:
@@ -206,11 +224,6 @@ def _run(ctx, sk, command, match):
             return "I couldn't reach the online service right now. Please check your internet and try again."
         log.exception("Skill %s crashed", sk.name)
         return "Sorry, something went wrong while doing that."
-    finally:
-        if timer is not None:
-            timer.cancel()
-            if ctx._one_sec is timer:
-                ctx._one_sec = None
 
 
 def _deliver(ctx, sk, result):

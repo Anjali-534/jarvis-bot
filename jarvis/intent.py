@@ -213,6 +213,7 @@ def router_model():
 
 
 def ask_openai(ctx, command):
+    """Returns (status, decision or None) or (status, error body)."""
     body = {
         "model": router_model(),
         "messages": [{"role": "system", "content": system_text(ctx)}, {"role": "user", "content": command}],
@@ -223,8 +224,7 @@ def ask_openai(ctx, command):
     response = http.post_json(f"{config.AI_BASE_URL}/chat/completions", body,
                               headers={"Authorization": f"Bearer {config.AI_API_KEY}"}, timeout=config.AI_ROUTER_TIMEOUT)
     if response.status_code >= 400:
-        log.info("[intent] AI router HTTP %s: %s", response.status_code, (getattr(response, "text", "") or "")[:200])
-        return None
+        return response.status_code, getattr(response, "text", "") or ""
     message = response.json()["choices"][0]["message"]
     for call in message.get("tool_calls") or []:
         function = call.get("function") or {}
@@ -232,12 +232,13 @@ def ask_openai(ctx, command):
             args = json.loads(function.get("arguments") or "{}")
         except ValueError:
             args = {}
-        return _decision(function.get("name", ""), args)
+        return 200, _decision(function.get("name", ""), args)
     text = (message.get("content") or "").strip()
-    return ("text", text) if text else None
+    return 200, (("text", text) if text else None)
 
 
-def ask_gemini(ctx, command):
+def ask_gemini(ctx, command, model=None, key=None, timeout=None):
+    """Returns (status, decision or None) or (status, error body). model/key/timeout: the backup's."""
     from jarvis.skills import ai
 
     body = {
@@ -247,18 +248,26 @@ def ask_gemini(ctx, command):
         "toolConfig": {"functionCallingConfig": {"mode": "ANY"}},  # must call a tool (a skill, or "reply")
         "generationConfig": {"temperature": 0, "maxOutputTokens": 200},
     }
-    url = f"{ai.GEMINI_BASE}/models/{router_model()}:generateContent"
-    response = http.post_json(url, body, headers=ai._gemini_headers(), timeout=config.AI_ROUTER_TIMEOUT)
+    url = f"{ai.GEMINI_BASE}/models/{model or router_model()}:generateContent"
+    response = http.post_json(url, body, headers=ai._gemini_headers(key), timeout=timeout or config.AI_ROUTER_TIMEOUT)
     if response.status_code >= 400:
-        log.info("[intent] AI router HTTP %s", response.status_code)
-        return None
+        return response.status_code, getattr(response, "text", "") or ""
     parts = (((response.json().get("candidates") or [{}])[0].get("content") or {}).get("parts")) or []
     for part in parts:
         if part.get("functionCall"):
             call = part["functionCall"]
-            return _decision(call.get("name", ""), call.get("args") or {})
+            return 200, _decision(call.get("name", ""), call.get("args") or {})
     text = "".join(p.get("text", "") for p in parts).strip()
-    return ("text", text) if text else None
+    return 200, (("text", text) if text else None)
+
+
+def ask_backup(ctx, command):
+    """Pick the action with the backup AI (Gemini): slower, so a longer timeout and "One sec." after 1.5 s."""
+    from jarvis import router
+
+    with router.one_sec(ctx):
+        return ask_gemini(ctx, command, model=config.GEMINI_MODEL, key=config.GEMINI_API_KEY,
+                          timeout=config.GEMINI_ROUTER_TIMEOUT)
 
 
 def decide(ctx, command):
@@ -271,10 +280,17 @@ def decide(ctx, command):
         return cache[key]
     from jarvis.skills import ai
 
+    ask = ask_gemini if ai.provider() == "gemini" else ask_openai
     try:
-        decision = (ask_gemini if ai.provider() == "gemini" else ask_openai)(ctx, command)
+        status, decision = ai.failover(lambda: ask(ctx, command), lambda: ask_backup(ctx, command), "routing")
+    except ai.BothFailed:
+        ctx.state["ai_down"] = command  # the chat fallback says so at once instead of trying both again
+        return None
     except Exception as exc:  # timeout (4 s), offline, odd response: plain chat will handle it
         log.info("[intent] AI router unavailable: %s", exc)
+        return None
+    if status >= 400:
+        log.info("[intent] AI router HTTP %s: %s", status, (decision or "")[:200])
         return None
     if decision and decision[0] == "tool" and key is not None:
         cache[key] = decision  # only actions are cached; chat answers should stay fresh
@@ -301,6 +317,9 @@ def resolve(ctx, command):
         return None
     log.info(f"(understood as: {phrase})")
     ctx.state["understood"] = phrase
+    from jarvis.skills import ai
+
+    ai.announce_switch(ctx)
     from jarvis import router
 
     if (sk.risky or target.risky) and not (target.confirms):

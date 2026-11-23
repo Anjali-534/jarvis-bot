@@ -33,8 +33,16 @@ Free AI keys:
 
 | Provider | Get a key | `AI_PROVIDER` | `AI_BASE_URL` | `AI_MODEL` |
 |---|---|---|---|---|
-| Gemini (Google AI Studio) | <https://aistudio.google.com/apikey> | `gemini` | `https://generativelanguage.googleapis.com/v1beta` | `gemini-2.5-flash` |
-| Groq (fastest) | <https://console.groq.com/keys> | `openai` | `https://api.groq.com/openai/v1` | `qwen/qwen3.8-27b` with `AI_REASONING_EFFORT=none` |
+| Groq (fastest, recommended) | <https://console.groq.com/keys> | `openai` | `https://api.groq.com/openai/v1` | `qwen/qwen3.8-27b` with `AI_REASONING_EFFORT=none` |
+| Gemini (Google AI Studio) | <https://aistudio.google.com/apikey> | `gemini` | `https://generativelanguage.googleapis.com/v1beta` | `gemini-3.5-flash-lite` |
+
+**Gemini as a backup.** Keep Groq as the main AI and also set `GEMINI_API_KEY` (and optionally `GEMINI_MODEL`, default `gemini-3.5-flash-lite`). Then, if Groq returns a rate limit (429), a server error (5xx), times out, or rejects its key or model, the same request (chat or picking an action) is retried once on Gemini, and Jarvis says "Switching to my backup brain" once per switch.
+- Picking an action on Gemini waits up to 8 seconds (`GEMINI_ROUTER_TIMEOUT`) and says "One sec" after 1.5 seconds.
+- After Groq's *daily* limit, Gemini goes first until midnight IST. This is saved in `data/cache.json`, so it survives a restart, and Jarvis goes back to Groq by itself after midnight.
+- If both fail, Jarvis says so in one sentence.
+- "Which AI model are you using" says whether the backup is in use, and why.
+
+Gemini is noticeably slower here (3 to 20 seconds, sometimes "high demand" errors), which is why it's the backup rather than the main AI.
 
 **Gemini** uses the native `generateContent` API with the key in the `x-goog-api-key` header. Google issues keys in two formats, the newer `AQ.…` auth keys and the older `AIza…` keys, and Jarvis sends both the same way. (`AQ.` keys don't work on Google's OpenAI-compatible `/v1beta/openai` endpoint, which is why Jarvis doesn't use it.) If the model has been retired, Jarvis switches to the newest Flash model for the session and logs the name to put in `AI_MODEL`.
 

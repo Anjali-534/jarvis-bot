@@ -126,3 +126,9 @@ SAMPLES_DIR = _path("SAMPLES_DIR", "data/samples")       # "record samples" save
 AI_ROUTING = _bool("AI_ROUTING", True)
 AI_ROUTER_MODEL = _str("AI_ROUTER_MODEL")             # empty = AI_MODEL
 AI_ROUTER_TIMEOUT = _float("AI_ROUTER_TIMEOUT", 4.0)  # seconds; on timeout it's treated as normal chat
+
+# Backup AI: if the main AI (Groq) is rate-limited, down, times out or rejects its key/model, the same request
+# is retried once on Gemini. After Groq's DAILY limit, Gemini goes first until midnight IST. Empty key = no backup.
+GEMINI_API_KEY = _str("GEMINI_API_KEY")
+GEMINI_MODEL = _str("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_ROUTER_TIMEOUT = _float("GEMINI_ROUTER_TIMEOUT", 8.0)  # Gemini is slower at picking an action than Groq

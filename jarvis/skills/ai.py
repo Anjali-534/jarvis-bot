@@ -1,7 +1,12 @@
-"""AI fallback: anything no other skill handled goes to Gemini (native API) or an OpenAI-compatible chat API."""
+"""AI fallback: anything no other skill handled goes to Gemini (native API) or an OpenAI-compatible chat API.
+
+If GEMINI_API_KEY is set and the main AI is Groq (or another OpenAI-compatible API), Gemini is the automatic
+backup: see failover().
+"""
 import logging
 import re
-from datetime import datetime
+import time
+from datetime import datetime, timedelta, timezone
 
 import config
 from jarvis import http
@@ -26,11 +31,13 @@ def system_prompt():
     )
 
 
+KEY_WORDS = ("api key", "auth key", "api_key_invalid", "access_token_type_unsupported", "unauthenticated")
+
+
 def error_message(status, body=""):
     """A clear spoken message for an HTTP error from the AI service."""
     body = (body or "").lower()
-    key_words = ("api key", "auth key", "api_key_invalid", "access_token_type_unsupported", "unauthenticated")
-    if status in (401, 403) or (status == 400 and any(w in body for w in key_words)):
+    if status in (401, 403) or (status == 400 and any(w in body for w in KEY_WORDS)):
         return "My AI key was rejected. Please check AI_API_KEY in your .env file."
     if status == 404:
         return (f"The AI model {config.AI_MODEL} wasn't found. "
@@ -75,8 +82,8 @@ def provider():
     return "gemini" if "generativelanguage.googleapis.com" in config.AI_BASE_URL else "openai"
 
 
-def _gemini_headers():
-    return {"x-goog-api-key": config.AI_API_KEY}  # works for both AQ. and AIza keys
+def _gemini_headers(key=None):
+    return {"x-goog-api-key": key or config.AI_API_KEY}  # works for both AQ. and AIza keys
 
 
 def gemini_payload(system, history, command):
@@ -140,27 +147,28 @@ def max_tokens_for(command):
 
 
 # ---------------------------------------------------------------- Gemini
-def _gemini_url(stream=False):
+def _gemini_url(stream=False, model=None):
     method = "streamGenerateContent?alt=sse" if stream else "generateContent"
-    return f"{GEMINI_BASE}/models/{config.AI_MODEL}:{method}"
+    return f"{GEMINI_BASE}/models/{model or config.AI_MODEL}:{method}"
 
 
-def _gemini_request(payload, stream=False):
+def _gemini_request(payload, stream=False, model=None, key=None):
+    """model/key: the backup's (GEMINI_MODEL, GEMINI_API_KEY) instead of AI_MODEL, AI_API_KEY."""
     send = http.post_stream if stream else http.post_json
-    return send(_gemini_url(stream), payload, headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
+    return send(_gemini_url(stream, model), payload, headers=_gemini_headers(key), timeout=config.AI_TIMEOUT)
 
 
-def _gemini_body(system, history, command, max_tokens):
+def _gemini_body(system, history, command, max_tokens, model=None):
     payload = gemini_payload(system, history, command)
     payload["generationConfig"]["maxOutputTokens"] = max_tokens
-    if "2.5-flash" in config.AI_MODEL:  # don't spend the short token budget on hidden "thinking"
+    if "2.5-flash" in (model or config.AI_MODEL):  # don't spend the short token budget on hidden "thinking"
         payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
     return payload
 
 
-def ask_gemini(system, history, command, max_tokens=SHORT_TOKENS):
+def ask_gemini(system, history, command, max_tokens=SHORT_TOKENS, model=None, key=None):
     """Returns (status, reply_or_error_body)."""
-    response = _gemini_request(_gemini_body(system, history, command, max_tokens))
+    response = _gemini_request(_gemini_body(system, history, command, max_tokens, model), model=model, key=key)
     if response.status_code >= 400:
         return response.status_code, getattr(response, "text", "") or ""
     return 200, gemini_text(response.json())
@@ -183,9 +191,10 @@ def _sse_events(response):
             continue
 
 
-def stream_gemini(system, history, command, max_tokens=SHORT_TOKENS):
+def stream_gemini(system, history, command, max_tokens=SHORT_TOKENS, model=None, key=None):
     """Returns (status, text chunks) or (status, error body)."""
-    response = _gemini_request(_gemini_body(system, history, command, max_tokens), stream=True)
+    response = _gemini_request(_gemini_body(system, history, command, max_tokens, model), stream=True,
+                               model=model, key=key)
     if response.status_code >= 400:
         return response.status_code, getattr(response, "text", "") or ""
 
@@ -336,19 +345,128 @@ def _with_recovery(ask, *args):
     return status, result
 
 
+# ---------------------------------------------------------------- the backup AI (Gemini behind Groq)
+BACKUP_SWITCH = "Switching to my backup brain."
+BOTH_DOWN = ("Sorry, my main AI and my backup AI are both unavailable right now. "
+             "Please try again in a minute.")
+BACKUP_UNTIL = "ai-backup-until"  # data/cache.json: after Groq's daily limit, Gemini goes first until then
+IST = timezone(timedelta(hours=5, minutes=30))
+_DAILY = re.compile(r"per day|\b(?:TPD|RPD)\b|daily", re.IGNORECASE)
+_on_backup = False        # did the last answer come from the backup?
+_backup_pending = False   # say BACKUP_SWITCH with the next answer
+
+
+class BothFailed(Exception):
+    """The main AI and the backup both failed."""
+
+
+def has_backup():
+    return bool(config.GEMINI_API_KEY) and provider() != "gemini"
+
+
+def now():
+    return time.time()
+
+
+def next_midnight_ist(timestamp=None):
+    moment = datetime.fromtimestamp(now() if timestamp is None else timestamp, IST)
+    return (moment + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+
+def backup_until():
+    """While Groq's daily limit is used up: the time (epoch seconds) to go back to Groq. Otherwise None."""
+    from jarvis import cache
+
+    until = cache.get(BACKUP_UNTIL, 2 * 24 * 3600)
+    return until if until and now() < until else None
+
+
+def is_daily_limit(status, body):
+    return status == 429 and bool(_DAILY.search(body or ""))
+
+
+def should_fail_over(status, body):
+    """Rate limit / quota, server trouble, or a key or model problem: worth asking the other AI."""
+    if status < 400:
+        return False
+    lowered = (body or "").lower()
+    return (status in (401, 403, 404, 429) or status >= 500 or is_retired(status, body)
+            or (status == 400 and any(w in lowered for w in KEY_WORDS)))
+
+
+def main_label():
+    return f"{provider_name()} ({config.AI_MODEL})"
+
+
+def backup_label():
+    return f"Gemini ({config.GEMINI_MODEL})"
+
+
+def _answered_by(which):
+    global _on_backup, _backup_pending
+    if which == "backup" and not _on_backup:
+        _on_backup, _backup_pending = True, True
+        log.warning("[ai] switching to the backup AI, %s", backup_label())
+    elif which == "main" and _on_backup:
+        _on_backup = False
+        log.warning("[ai] back on the main AI, %s", main_label())
+
+
+def failover(main, backup, what="chat"):
+    """Call main(); if it fails in a way the backup might not (rate limit, 5xx, timeout, key or model error),
+    call backup() once. Each returns (status, result). After a daily-limit 429, backup() goes first until
+    midnight IST (main() is still tried if the backup fails). Raises BothFailed if neither answers.
+    """
+    if not has_backup():
+        return main()
+    sticky = backup_until()
+    order = [("backup", backup), ("main", main)] if sticky else [("main", main), ("backup", backup)]
+    for which, call in order:
+        label = backup_label() if which == "backup" else main_label()
+        try:
+            status, result = call()
+        except Blocked:
+            raise
+        except Exception as exc:  # timeout, offline, odd response
+            log.warning("[ai] %s %s failed: %s", label, what, exc)
+            continue
+        if status < 400:
+            _answered_by(which)
+            return status, result
+        body = result if isinstance(result, str) else ""
+        log.warning("[ai] %s %s: HTTP %s %s", label, what, status, body[:200])
+        if which == "main" and not sticky and is_daily_limit(status, body):
+            from jarvis import cache
+
+            until = next_midnight_ist()
+            cache.put(BACKUP_UNTIL, until)
+            log.warning("[ai] %s's daily limit is used up: using the backup until %s IST",
+                        provider_name(), datetime.fromtimestamp(until, IST).strftime("%d %b %H:%M"))
+        if not should_fail_over(status, body):
+            return status, result  # e.g. a malformed request: the other AI wouldn't do better
+    raise BothFailed(what)
+
+
+def _backup_args():
+    return {"model": config.GEMINI_MODEL, "key": config.GEMINI_API_KEY}
+
+
 def complete(system, history, command, max_tokens=SHORT_TOKENS):
     """Ask the configured AI. Returns (status, text): text is the reply, or the error body if status >= 400.
 
-    Raises Blocked if Gemini refused to answer. A retired model is replaced automatically.
+    Raises Blocked if Gemini refused to answer, BothFailed if the main AI and the backup both failed.
+    A retired model is replaced automatically.
     """
     ask = ask_gemini if provider() == "gemini" else ask_openai
-    return _with_recovery(ask, system, history, command, max_tokens)
+    return failover(lambda: _with_recovery(ask, system, history, command, max_tokens),
+                    lambda: ask_gemini(system, history, command, max_tokens, **_backup_args()))
 
 
 def stream(system, history, command, max_tokens=SHORT_TOKENS):
     """Like complete(), but the reply comes back as an iterator of text chunks as they're generated."""
     ask = stream_gemini if provider() == "gemini" else stream_openai
-    return _with_recovery(ask, system, history, command, max_tokens)
+    return failover(lambda: _with_recovery(ask, system, history, command, max_tokens),
+                    lambda: stream_gemini(system, history, command, max_tokens, **_backup_args()))
 
 
 def _model_cache_key():
@@ -428,8 +546,11 @@ def sentences(chunks, min_length=MIN_SENTENCE):
 
 
 def announce_switch(ctx):
-    """Say "I switched to a newer AI model." once after a switch."""
-    global _switch_pending
+    """Say "Switching to my backup brain." / "I switched to a newer AI model." once after a switch."""
+    global _switch_pending, _backup_pending
+    if _backup_pending:
+        _backup_pending = False
+        ctx.say(BACKUP_SWITCH, wait=False)
     if _switch_pending:
         _switch_pending = False
         ctx.say(SWITCHED, wait=False)
@@ -440,6 +561,8 @@ def ai(ctx, command, match=None):
     if not config.AI_API_KEY:
         return ("I don't know how to answer that yet. "
                 "To let me answer anything, add an AI_API_KEY to the .env file.")
+    if ctx.state.pop("ai_down", None) == command:
+        return BOTH_DOWN  # the AI router just tried both for this command: don't make the user wait twice
     history = ctx.state.setdefault("ai_history", [])
     spoken = []
     try:
@@ -459,6 +582,8 @@ def ai(ctx, command, match=None):
                 break  # barge-in: stop reading the rest
             ctx.say(text, wait=False)  # speak this sentence while the next one is still being generated
             spoken.append(text)
+    except BothFailed:
+        return BOTH_DOWN
     except Blocked as exc:
         log.info("[ai] response blocked: %s", exc)
         if not spoken:

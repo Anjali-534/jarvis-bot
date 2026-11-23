@@ -74,6 +74,11 @@ def offline(monkeypatch, tmp_path):
     from jarvis.skills import ai as ai_skill
 
     monkeypatch.setattr(ai_skill, "_switch_pending", False)
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")  # backup tests switch it on
+    monkeypatch.setattr(config, "GEMINI_MODEL", "gemini-3.5-flash-lite")
+    monkeypatch.setattr(config, "GEMINI_ROUTER_TIMEOUT", 8.0)
+    monkeypatch.setattr(ai_skill, "_on_backup", False)
+    monkeypatch.setattr(ai_skill, "_backup_pending", False)
     monkeypatch.setattr(config, "SAMPLES_DIR", tmp_path / "data" / "samples")
     monkeypatch.setattr(config, "ONE_SEC_AFTER", 0)   # tests that need "One sec." turn it on
     monkeypatch.setattr(config, "CALENDAR_REMINDER_MINUTES", 10)
