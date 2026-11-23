@@ -51,10 +51,24 @@ python main.py            # voice, say "Jarvis ..." first
 python main.py --no-wake  # voice, every phrase is a command
 python main.py --text     # type commands (wake word not needed)
 python main.py --mute     # print replies instead of speaking
+python main.py --timing   # print how long each step of every turn took
+python -m jarvis.benchmark  # compare Google vs Whisper speech-to-text on your recorded samples
 python -m pytest -q       # run the offline tests
 ```
 
 With no microphone, Jarvis switches to text mode automatically. After it replies you have `FOLLOW_UP_SECONDS` (20 by default) to carry on without saying the wake word. Press Ctrl+C to quit at any time.
+
+## How listening works (and why it's fast)
+
+- **Offline wake word.** Jarvis listens for **"Hey Jarvis"** on the laptop itself, using [openWakeWord](https://github.com/dscripka/openWakeWord)'s pretrained model on a continuous 16 kHz stream. Nothing is sent anywhere until it hears you. Then it **beeps**, and you say the command. `WAKE_SENSITIVITY` (0 to 1, default 0.5) sets how sure it must be: lower it if it misses you, raise it if it wakes by itself. If openWakeWord can't load, Jarvis falls back to looking for "Jarvis" in the transcript as before.
+- **One microphone stream, opened once.** The old code reopened the mic for every phrase (about 250 ms each time).
+- **End of speech.** A command ends after **600 ms of silence** (`END_SILENCE_MS`). Silence is detected with webrtcvad plus an energy threshold of the calibrated room level × 1.3. Jarvis waits up to 5 seconds for you to start (`LISTEN_TIMEOUT`), and a command can be up to 7 seconds long (`PHRASE_LIMIT`). It re-measures the room quietly after 10 idle minutes, or when you say **"recalibrate mic"**.
+- **Speech-to-text.** `STT_ENGINE=google` (default) or `whisper`. Whisper runs locally with faster-whisper (`base.en` for English, `small` for Hindi). It uses CUDA when an NVIDIA GPU is available, otherwise the CPU with int8. The model loads in the background, and Google is used until it's ready. To see which is faster on your laptop, say **"record samples"** (5 short phrases saved to `data\samples\`), then run `python -m jarvis.benchmark`.
+- **Snappier replies.** The voice speaks at 185 words a minute (`VOICE_RATE`). If a skill takes more than 1.5 seconds (`ONE_SEC_AFTER`), Jarvis says "One sec" first. Network calls time out after 6 seconds, the AI after 15. Weather and AQI are cached on disk for 10 minutes (`CACHE_MINUTES`) and place lookups for 30 days, in `data\cache.json`.
+- **Barge-in.** Pressing **Ctrl+Alt+J** while Jarvis is talking stops it immediately and starts listening.
+- **Startup.** Heavy libraries (requests, pyautogui, pystray, Whisper, openWakeWord) are loaded only when needed or in the background. Run with `--timing` to see where each turn's time goes, for example `[timing] wake word at 0.00s | speech detected at 0.41s | end of phrase at 1.92s | speech-to-text 0.55s | routing + skill 0.02s | text-to-speech 1.80s`.
+
+In the follow-up window after a reply (`FOLLOW_UP_SECONDS`), Jarvis listens without the wake word, so speech in that window is sent to the speech-to-text engine. Set `FOLLOW_UP_SECONDS=0` if you want nothing sent without "Hey Jarvis".
 
 ## Running in the background
 
@@ -101,7 +115,9 @@ Spotify only allows apps to control playback on **Premium** accounts. Without a 
 📄 **Printable cheat sheet: [COMMANDS.md](COMMANDS.md).** Say "Jarvis, help" for the categories, or "help with WhatsApp" (or laptop, VS Code...) for examples from one category.
 
 **Wake and control**
-- "Jarvis", "Hey Jarvis", or "OK Jarvis", at the start or end of a sentence
+- "Hey Jarvis", then wait for the beep (offline wake word). If openWakeWord isn't available: "Jarvis", "Hey Jarvis" or "OK Jarvis" at the start or end of a sentence
+- Ctrl+Alt+J wakes it instantly, and also interrupts it while it's talking
+- "Recalibrate mic" / "record samples"
 - "Go to sleep" / "stop listening" (only the wake word wakes it again)
 - "Goodbye", "exit", "bye Jarvis", "turn off Jarvis"
 - "Help" / "what can you do"
@@ -207,7 +223,12 @@ jarvis/notify.py        Windows toasts (win11toast, tray balloon fallback)
 jarvis/startup.py       Startup-folder shortcut logic
 jarvis/instance.py      single instance (named mutex) + "wake the running copy" signal
 jarvis/logs.py          rotating log file + console
-jarvis/voice.py         Voice: TTS on a worker thread (thread-safe speak), Google STT, text mode
+jarvis/voice.py         Voice: interruptible TTS on a worker thread, listening (wake word -> record -> STT), text mode
+jarvis/audio.py         always-open 16 kHz mic stream, webrtcvad end-of-speech, openWakeWord "hey jarvis"
+jarvis/stt.py           speech-to-text engines: Google, or faster-whisper loaded in the background
+jarvis/timing.py        per-turn latency log (--timing)
+jarvis/cache.py         small on-disk cache (data/cache.json) for weather, AQI and places
+jarvis/benchmark.py     python -m jarvis.benchmark: Google vs Whisper on data/samples/*.wav
 jarvis/router.py        @skill / @fallback registry, Context (say/ask/confirm), handle()
 jarvis/translit.py      Hindi (Devanagari) -> English command rewriting
 jarvis/http.py          shared requests.Session with timeouts: get_json / get_text / post_json
@@ -281,5 +302,5 @@ Some guidelines:
 - **Email:** reply to a thread, read attachments
 - **Calendar:** invite people to events, move an event to another time
 - **Hindi:** more phrase coverage in `translit.py`, and Hindi replies for the built-in skills (not just the AI)
-- Offline wake word (Porcupine / openWakeWord) and offline speech recognition
+- A custom-trained "Jarvis" wake word (the pretrained model needs "Hey Jarvis")
 - Reminders that persist across restarts

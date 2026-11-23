@@ -8,7 +8,6 @@ import difflib
 import html
 import logging
 import re
-from email.mime.text import MIMEText
 from email.utils import parseaddr, parsedate_to_datetime
 
 import config
@@ -256,6 +255,8 @@ def subject_from(body):
 
 
 def create_draft(service, to, subject, body):
+    from email.mime.text import MIMEText
+
     message = MIMEText(body)
     message["to"] = to
     message["subject"] = subject

@@ -64,6 +64,9 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "SPOTIFY_TOKEN_FILE", tmp_path / "data" / "spotify_token.json")
     monkeypatch.setattr(config, "SPOTIFY_CLIENT_ID", "")
     monkeypatch.setattr(config, "CALENDAR_REMINDERS", True)
+    monkeypatch.setattr(config, "CACHE_FILE", tmp_path / "data" / "cache.json")
+    monkeypatch.setattr(config, "SAMPLES_DIR", tmp_path / "data" / "samples")
+    monkeypatch.setattr(config, "ONE_SEC_AFTER", 0)   # tests that need "One sec." turn it on
     monkeypatch.setattr(config, "CALENDAR_REMINDER_MINUTES", 10)
     monkeypatch.setattr(vscode, "_cache", None)
     geo._CACHE.clear()

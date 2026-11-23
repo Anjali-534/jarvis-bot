@@ -8,10 +8,9 @@ A skill is a function ``handler(ctx, command, match)`` registered with ``@skill`
 """
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import Callable
-
-import requests
 
 log = logging.getLogger(__name__)
 
@@ -107,9 +106,13 @@ class Context:
     running: bool = True
     sleeping: bool = False
     last_skill: str | None = None
+    _one_sec: object = field(default=None, repr=False)  # pending "One sec." timer
 
     def say(self, text, wait=True):
         if text:
+            pending, self._one_sec = self._one_sec, None
+            if pending is not None and text != ONE_SEC:
+                pending.cancel()  # the skill spoke in time
             self.voice.speak(text, wait=wait)
 
     def ask(self, prompt):
@@ -120,17 +123,48 @@ class Context:
         return is_yes(self.ask(prompt))
 
 
+ONE_SEC = "One sec."
+
+
+def _start_one_sec(ctx):
+    """Say "One sec." if the skill hasn't said anything after ONE_SEC_AFTER seconds (slow network calls)."""
+    import config
+
+    delay = getattr(config, "ONE_SEC_AFTER", 0)
+    if not delay or delay <= 0:
+        return None
+
+    def fire():
+        if ctx._one_sec is timer:  # still waiting and nothing said yet
+            ctx._one_sec = None
+            ctx.say(ONE_SEC, wait=False)
+
+    timer = threading.Timer(delay, fire)
+    timer.daemon = True
+    ctx._one_sec = timer
+    timer.start()
+    return timer
+
+
 def _run(ctx, sk, command, match):
+    timer = _start_one_sec(ctx)
     try:
         return sk.handler(ctx, command, match)
     except SpokenError as exc:
         return str(exc)
-    except requests.RequestException as exc:
-        log.warning(f"[{sk.name}] network error: {exc}")
-        return "I couldn't reach the online service right now. Please check your internet and try again."
-    except Exception:  # never let one skill crash the assistant
+    except Exception as exc:  # never let one skill crash the assistant
+        from jarvis import http
+
+        if http.is_request_error(exc):
+            log.warning(f"[{sk.name}] network error: {exc}")
+            return "I couldn't reach the online service right now. Please check your internet and try again."
         log.exception("Skill %s crashed", sk.name)
         return "Sorry, something went wrong while doing that."
+    finally:
+        if timer is not None:
+            timer.cancel()
+            if ctx._one_sec is timer:
+                ctx._one_sec = None
 
 
 def _deliver(ctx, sk, result):

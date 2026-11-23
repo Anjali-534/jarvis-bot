@@ -4,6 +4,7 @@
     python main.py --no-wake  voice mode, every phrase is a command
     python main.py --text     type instead of talking (wake word off)
     python main.py --mute     print replies instead of speaking them
+    python main.py --timing   print how long each step of every turn took
 
 To run in the background with a tray icon instead, use run_jarvis.pyw.
 """
@@ -43,8 +44,13 @@ def main(argv=None):
     parser.add_argument("--text", action="store_true", help="type commands instead of speaking")
     parser.add_argument("--no-wake", action="store_true", help="don't require the wake word")
     parser.add_argument("--mute", action="store_true", help="print replies instead of speaking them")
+    parser.add_argument("--timing", action="store_true", help="print per-turn latency (wake, STT, skill, TTS)")
     args = parser.parse_args(argv)
     setup_logging(console=True)
+    if args.timing:
+        from jarvis import timing
+
+        timing.ENABLED = True
 
     instance = SingleInstance()
     if not instance.acquire():

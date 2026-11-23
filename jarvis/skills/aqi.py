@@ -119,7 +119,7 @@ def fetch_air(places):
         "longitude": ",".join(f"{p.lon:.4f}" for p in places),
         "current": ",".join(POLLUTANTS), "hourly": ",".join(POLLUTANTS),
         "past_days": 1, "forecast_days": 1, "timezone": "auto",
-    })
+    }, cache_ttl=config.CACHE_MINUTES * 60)
     items = data if isinstance(data, list) else [data]
     return [parse_reading(place, item) for place, item in zip(places, items)]
 
@@ -187,7 +187,7 @@ def _waqi_red_zones(place):
     data = http.get_json(WAQI_BOUNDS_URL, params={
         "latlng": f"{place.lat - 0.35},{place.lon - 0.35},{place.lat + 0.35},{place.lon + 0.35}",
         "networks": "all", "token": config.WAQI_TOKEN,
-    })
+    }, cache_ttl=config.CACHE_MINUTES * 60)
     if data.get("status") != "ok":
         raise ValueError(f"WAQI error: {data.get('data')}")
     stations = []

@@ -1,6 +1,7 @@
 """Weather and rain forecasts from Open-Meteo (no API key)."""
 import re
 
+import config
 from jarvis import geo, http
 from jarvis.router import skill
 
@@ -26,7 +27,7 @@ def forecast(place):
         "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
         "timezone": "auto", "forecast_days": 2,
-    })
+    }, cache_ttl=config.CACHE_MINUTES * 60)
 
 
 def _day(data, index):

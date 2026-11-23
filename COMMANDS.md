@@ -8,8 +8,12 @@
 | `python main.py --no-wake` | Voice mode without the wake word. Every phrase is a command. |
 | `python main.py --text` | Type commands instead of speaking. No wake word needed. |
 | `python main.py --mute` | Print replies instead of speaking them. Combine with the others, e.g. `--text --mute`. |
+| `python main.py --timing` | Print how long each step of every turn took (wake word, speech, speech-to-text, skill, voice). |
+| `python -m jarvis.benchmark` | Compare Google and Whisper speech-to-text on your recorded samples. |
 
-**Wake word:** "Jarvis", "Hey Jarvis" or "OK Jarvis", at the start or end of the sentence: "Jarvis, what's the AQI?" / "What's the weather, Jarvis?"
+**Wake word:** say **"Hey Jarvis"**, wait for the **beep**, then say the command. The wake word is detected offline on your laptop. (If the offline detector can't load, it falls back to "Jarvis", "Hey Jarvis" or "OK Jarvis" at the start or end of the sentence.)
+**Interrupt:** press **Ctrl+Alt+J** while Jarvis is talking to stop it and give a new command.
+**Microphone:** "recalibrate mic" if it struggles to hear you, or keeps hearing noise. "Record samples" saves 5 test phrases for `python -m jarvis.benchmark`.
 After Jarvis replies you have **20 seconds** to carry on without the wake word.
 
 **Pause and resume:** "go to sleep" or "stop listening", then just "Jarvis" to wake it up.

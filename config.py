@@ -45,7 +45,7 @@ FOLLOW_UP_SECONDS = _int("FOLLOW_UP_SECONDS", 20)
 
 SPEECH_LANGUAGE = _str("SPEECH_LANGUAGE", "en-IN")
 VOICE_NAME = _str("VOICE_NAME", "zira")
-VOICE_RATE = _int("VOICE_RATE", 170)
+VOICE_RATE = _int("VOICE_RATE", 185)
 
 DEFAULT_LOCATION = _str("DEFAULT_LOCATION", "New Delhi")
 COUNTRY_CODE = _str("COUNTRY_CODE", "in")
@@ -98,3 +98,14 @@ CALENDAR_REMINDER_MINUTES = _int("CALENDAR_REMINDER_MINUTES", 10)
 SPOTIFY_CLIENT_ID = _str("SPOTIFY_CLIENT_ID")
 SPOTIFY_REDIRECT_URI = _str("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback")
 SPOTIFY_TOKEN_FILE = _path("SPOTIFY_TOKEN_FILE", "data/spotify_token.json")
+
+# Speed: offline wake word, voice activity detection, speech-to-text engine, caching
+WAKE_SENSITIVITY = _float("WAKE_SENSITIVITY", 0.5)      # openWakeWord "hey jarvis" score needed (0-1)
+STT_ENGINE = _str("STT_ENGINE", "google").lower()        # google | whisper (faster-whisper, local)
+LISTEN_TIMEOUT = _float("LISTEN_TIMEOUT", 5.0)           # seconds to wait for you to start talking
+PHRASE_LIMIT = _float("PHRASE_LIMIT", 7.0)               # longest single command, seconds
+END_SILENCE_MS = _int("END_SILENCE_MS", 600)             # this much silence ends the command
+ONE_SEC_AFTER = _float("ONE_SEC_AFTER", 1.5)             # say "One sec" if a skill takes longer than this
+CACHE_FILE = _path("CACHE_FILE", "data/cache.json")
+CACHE_MINUTES = _int("CACHE_MINUTES", 10)                # weather and AQI
+SAMPLES_DIR = _path("SAMPLES_DIR", "data/samples")       # "record samples" saves WAVs here for the benchmark

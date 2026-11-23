@@ -18,6 +18,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
 ]
 
+TIMEOUT = 6
 NOT_CONNECTED = "Your Google account isn't connected yet. Say connect google to set it up."
 EXPIRED = "Your Google sign-in has expired or was revoked. Say connect google to sign in again."
 MISSING_LIBS = "The Google libraries aren't installed. Run pip install -r requirements.txt, then try again."
@@ -109,9 +110,12 @@ def service(name, version):
     creds = load_credentials()
     if creds is None:
         raise NotConnected(NOT_CONNECTED)
+    import httplib2
+    from google_auth_httplib2 import AuthorizedHttp
     from googleapiclient.discovery import build
 
-    return build(name, version, credentials=creds, cache_discovery=False)
+    authed = AuthorizedHttp(creds, http=httplib2.Http(timeout=TIMEOUT))  # 6 s, like other APIs
+    return build(name, version, http=authed, cache_discovery=False)
 
 
 def run_flow():

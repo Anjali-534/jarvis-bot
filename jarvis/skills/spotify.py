@@ -88,7 +88,7 @@ def client():
         raise SpokenError(EXPIRED) from exc
     if not token:
         return None
-    return spotipy.Spotify(auth=token["access_token"], requests_timeout=10, retries=1)
+    return spotipy.Spotify(auth=token["access_token"], requests_timeout=6, retries=1)
 
 
 def run_flow():
@@ -97,7 +97,7 @@ def run_flow():
 
     manager = auth_manager()
     token = manager.get_access_token(check_cache=False)  # listens on the redirect URI for the callback
-    user = spotipy.Spotify(auth=token, requests_timeout=10).current_user()
+    user = spotipy.Spotify(auth=token, requests_timeout=6).current_user()
     return user.get("display_name") or user.get("id") or "you"
 
 

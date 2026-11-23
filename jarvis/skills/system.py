@@ -264,3 +264,63 @@ def autostart(ctx, command, match):
         return "Okay, I won't."
     startup.install()
     return f"Done. {config.ASSISTANT_NAME} will start in the tray when you log in."
+
+
+# ---------------------------------------------------------------- microphone
+@skill("recalibrate mic", r"\b(?:re-?calibrate|calibrate)\s+(?:the\s+|my\s+)?(?:mic|microphone)\b",
+       r"\b(?:mic|microphone)\s+(?:re-?calibrat\w*|calibrat\w*)\b", category="laptop", help=["recalibrate mic"])
+def recalibrate_mic(ctx, command, match):
+    calibrate = getattr(ctx.voice, "calibrate", None)
+    if getattr(ctx.voice, "text_mode", False) or calibrate is None:
+        return "The microphone isn't in use in text mode."
+    ctx.say("Stay quiet for a moment.")
+    threshold = calibrate()
+    if threshold is None:
+        return "I couldn't reach the microphone."
+    return "Done. I've re-measured the background noise."
+
+
+SAMPLE_PHRASES = [
+    "what's the weather",
+    "open notepad",
+    "set a timer for five minutes",
+    "what's the AQI in Rohini",
+    "check my email",
+]
+
+
+def save_wav(path, pcm, rate=16000):
+    import wave
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(pcm)
+
+
+@skill("record samples", r"\brecord\s+(?:voice\s+|speech\s+|audio\s+)?samples?\b", category="laptop",
+       help=["record samples"])
+def record_samples(ctx, command, match):
+    record = getattr(ctx.voice, "record_sample", None)
+    if getattr(ctx.voice, "text_mode", False) or record is None:
+        return "Recording samples needs the microphone. Start me without --text."
+    folder = config.SAMPLES_DIR
+    saved = 0
+    for number, phrase in enumerate(SAMPLE_PHRASES, 1):
+        ctx.say(f"Sample {number}. After the beep, say: {phrase}.")
+        from jarvis.voice import beep
+
+        beep()
+        pcm = record()
+        if not pcm:
+            ctx.say("I didn't hear anything, skipping that one.")
+            continue
+        save_wav(folder / f"sample{number}.wav", pcm)
+        (folder / f"sample{number}.txt").write_text(phrase, encoding="utf-8")
+        saved += 1
+    if not saved:
+        return "I didn't record any samples."
+    return (f"Saved {saved} samples in data, samples. Run python -m jarvis.benchmark to compare the "
+            "speech engines.")

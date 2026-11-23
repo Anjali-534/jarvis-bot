@@ -10,6 +10,7 @@ import threading
 import time
 
 import config
+from jarvis import timing
 from jarvis.router import Context, handle, run_startup
 
 log = logging.getLogger(__name__)
@@ -71,6 +72,16 @@ def beep():
             pass
 
 
+def _warm_up():
+    """Import the network stack in the background so the first online command isn't slower."""
+    try:
+        from jarvis import http
+
+        http.session()
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------- the loop
 class Assistant:
     LISTENING, SLEEPING, MUTED = "Listening", "Sleeping", "Muted"
@@ -106,7 +117,11 @@ class Assistant:
                 log.exception("status callback failed")
 
     def wake(self):
-        """Hotkey / tray: listen right now, no wake word needed for the next phrase."""
+        """Hotkey / tray: stop talking (barge-in) and listen right now, no wake word needed."""
+        for action in ("stop_speaking", "cancel_wait"):
+            fn = getattr(self.voice, action, None)
+            if fn:
+                fn()
         self.mic_muted = False
         self.ctx.sleeping = False
         self._forced.set()
@@ -134,8 +149,24 @@ class Assistant:
         return self.ctx.running
 
     # ------------------------------------------------------------ one utterance
-    def step(self, heard):
-        """Process one thing heard. Returns the skill that handled it, or None if ignored."""
+    def needs_wake_word(self):
+        """Should the next listen wait for the offline wake word? (False in the follow-up window.)"""
+        if not self.wake_enabled or not getattr(self.voice, "offline_wake", False) or self._forced.is_set():
+            return False
+        return self.ctx.sleeping or time.monotonic() - self._last_reply > config.FOLLOW_UP_SECONDS
+
+    def listen_once(self):
+        """Listen (waiting for the offline wake word if needed) and handle what was heard."""
+        if self.needs_wake_word():
+            heard = self.voice.listen(wake=True)
+            return self.step(heard, detected=bool(getattr(self.voice, "last_wake", False)))
+        return self.step(self.voice.listen())
+
+    def step(self, heard, detected=False):
+        """Process one thing heard. Returns the skill that handled it, or None if ignored.
+
+        detected: the offline wake word already fired, so no spoken wake word is needed.
+        """
         if not heard:
             if not self.wake_enabled and not self.ctx.sleeping:
                 self._misses += 1
@@ -145,7 +176,7 @@ class Assistant:
             return None
         self._misses = 0
         woke, command = strip_wake_word(heard)
-        forced = self._forced.is_set()
+        forced = self._forced.is_set() or detected
         if forced:
             self._forced.clear()
             woke = True
@@ -164,7 +195,13 @@ class Assistant:
         if not command:
             self.ctx.say("Yes?")
         else:
+            turn = timing.current()
+            tts_before = turn.durations.get("tts", 0.0) if turn else 0.0
+            started = time.perf_counter()
             handled = handle(self.ctx, command)
+            if turn:  # skill time without the time spent speaking the reply
+                turn.add("skill", time.perf_counter() - started - (turn.durations.get("tts", 0.0) - tts_before))
+            timing.finish()
         self._last_reply = time.monotonic()
         self._notify_status()  # "go to sleep" may have changed it
         return handled
@@ -174,8 +211,12 @@ class Assistant:
 
         self.ctx.say(f"Good {time_of_day()}, {config.USER_NAME}. {config.ASSISTANT_NAME} is online.")
         name = config.ASSISTANT_NAME
-        log.info(f"Say '{name}, help' to hear what I can do. Full list: COMMANDS.md"
-                 if self.wake_enabled else "Say 'help' to hear what I can do. Full list: COMMANDS.md")
+        if self.wake_enabled and getattr(self.voice, "offline_wake", False):
+            log.info("Say 'Hey Jarvis', wait for the beep, then say 'help' to hear what I can do. "
+                     "Full list: COMMANDS.md")
+        else:
+            log.info(f"Say '{name}, help' to hear what I can do. Full list: COMMANDS.md"
+                     if self.wake_enabled else "Say 'help' to hear what I can do. Full list: COMMANDS.md")
         if config.HOTKEY and not getattr(self.voice, "text_mode", False):
             log.info("Or press %s to talk without the wake word.", config.HOTKEY.upper())
         self._last_reply = time.monotonic()
@@ -185,12 +226,13 @@ class Assistant:
         """The loop. Returns when someone says goodbye, stop() is called, or Ctrl+C."""
         self.greet()
         run_startup(self.ctx)  # e.g. calendar reminders, if Google is connected
+        threading.Thread(target=_warm_up, name="warm-up", daemon=True).start()
         try:
             while self.ctx.running:
                 if self.mic_muted:
                     time.sleep(0.25)
                     continue
-                self.step(self.voice.listen())
+                self.listen_once()
         except KeyboardInterrupt:
             self.ctx.say(f"Goodbye, {config.USER_NAME}.")
         finally:

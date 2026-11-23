@@ -13,3 +13,8 @@ win11toast
 google-auth-oauthlib
 google-api-python-client
 spotipy
+numpy
+openwakeword
+onnxruntime
+webrtcvad-wheels
+faster-whisper

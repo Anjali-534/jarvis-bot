@@ -2,8 +2,6 @@
 import re
 from dataclasses import dataclass
 
-import requests
-
 import config
 from jarvis import http
 from jarvis.router import SpokenError
@@ -22,6 +20,7 @@ class Place:
 FALLBACK_PLACES = {"new delhi": Place("New Delhi", 28.6139, 77.2090), "delhi": Place("Delhi", 28.6519, 77.2315)}
 
 _CACHE: dict[str, Place | None] = {}
+PLACE_CACHE_SECONDS = 30 * 24 * 3600  # places don't move: keep geocoding results on disk for 30 days
 
 PINCODE_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]")
@@ -77,7 +76,7 @@ def _nominatim(query):
         params.update(postalcode=pin, country="India")
     else:
         params.update(q=query, countrycodes=config.COUNTRY_CODE)
-    results = http.get_json(NOMINATIM_URL, params=params)
+    results = http.get_json(NOMINATIM_URL, params=params, cache_ttl=PLACE_CACHE_SECONDS)
     if not results:
         return None
     first = results[0]
@@ -95,7 +94,7 @@ def _open_meteo(query):
     params = {"name": query, "count": 1, "language": "en", "format": "json"}
     if config.COUNTRY_CODE:
         params["countryCode"] = config.COUNTRY_CODE.upper()
-    data = http.get_json(OPEN_METEO_GEOCODE_URL, params=params)
+    data = http.get_json(OPEN_METEO_GEOCODE_URL, params=params, cache_ttl=PLACE_CACHE_SECONDS)
     results = data.get("results") or []
     if not results:
         return None
@@ -115,14 +114,16 @@ def geocode(query):
     for finder in (_nominatim, _open_meteo):
         try:
             place = finder(key)
-        except (requests.RequestException, ValueError, KeyError) as exc:
+        except Exception as exc:  # network errors (requests is imported lazily), bad data
+            if not (http.is_request_error(exc) or isinstance(exc, (ValueError, KeyError))):
+                raise
             error = exc
             continue
         if place:
             break
     if place is None:
         place = FALLBACK_PLACES.get(key)
-    if place is None and isinstance(error, requests.RequestException):
+    if place is None and http.is_request_error(error):
         raise error
     _CACHE[key] = place
     return place
