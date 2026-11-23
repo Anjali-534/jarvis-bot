@@ -1,4 +1,4 @@
-"""YouTube, Google search and news."""
+"""YouTube and news. (Web search, answered by voice, is in browse.py.)"""
 import logging
 import re
 import webbrowser
@@ -43,13 +43,6 @@ def youtube_search(ctx, command, match):
     query = match.group(1).strip()
     open_url(f"https://www.youtube.com/results?search_query={quote_plus(query)}")
     return f"Searching YouTube for {query}."
-
-
-@skill("google", r"^(?:please\s+)?(?:search|google|look up|search for|search google for)\s+(?:for\s+)?(.+?)(?:\s+on google)?$", category='web', help=['search best laptops under 60000'])
-def google(ctx, command, match):
-    query = match.group(1).strip()
-    open_url(f"https://www.google.com/search?q={quote_plus(query)}")
-    return f"Searching Google for {query}."
 
 
 # ---------------------------------------------------------------- news

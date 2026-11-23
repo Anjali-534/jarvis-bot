@@ -20,7 +20,7 @@ HINDI_ROUTES = [
     ("क्रोम बंद करो", "close chrome", "close"),
     ("अरिजीत सिंह के गाने बजाओ", "play अरिजीत सिंह के songs", "play youtube"),
     ("यूट्यूब पर लोफी म्यूज़िक सर्च करो", "search लोफी music on youtube", "youtube search"),
-    ("गूगल पर बेस्ट लैपटॉप सर्च करो", "search बेस्ट laptop", "google"),
+    ("गूगल पर बेस्ट लैपटॉप सर्च करो", "search बेस्ट laptop", "web search"),
     ("आवाज़ बढ़ाओ", "volume up", "volume up"),
     ("आवाज कम करो", "volume down", "volume down"),       # without the nukta, as Google often writes it
     ("म्यूट करो", "mute", "mute"),

@@ -37,6 +37,8 @@ def wikipedia(ctx, command, match):
     topic = match.group(1).strip()
     if not topic or len(topic) < 2 or re.search(r"\b(?:you|your|my|i|me|this|that|it)\b", topic):
         return None
+    if re.search(r"\b(?:current|currently|now|today|latest|new|this year|abhi)\b", topic):
+        return None  # "who is the current CEO of X": Wikipedia may be out of date, so the web search answers
     try:
         return wikipedia_summary(topic)
     except Exception as exc:

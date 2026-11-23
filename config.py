@@ -132,3 +132,9 @@ AI_ROUTER_TIMEOUT = _float("AI_ROUTER_TIMEOUT", 4.0)  # seconds; on timeout it's
 GEMINI_API_KEY = _str("GEMINI_API_KEY")
 GEMINI_MODEL = _str("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_ROUTER_TIMEOUT = _float("GEMINI_ROUTER_TIMEOUT", 8.0)  # Gemini is slower at picking an action than Groq
+
+# Live web browsing ("search the web for X", "petrol price in delhi today"): answered by voice from web pages
+SEARCH_PROVIDER = _str("SEARCH_PROVIDER", "auto").lower()  # auto = tavily, groq, ddgs; or a list, e.g. "ddgs"
+TAVILY_API_KEY = _str("TAVILY_API_KEY")                     # optional: https://app.tavily.com (free tier)
+SEARCH_BUDGET = _float("SEARCH_BUDGET", 8.0)                # seconds for searching + reading pages
+SEARCH_CACHE_MINUTES = _int("SEARCH_CACHE_MINUTES", 30)

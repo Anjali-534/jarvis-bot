@@ -31,6 +31,8 @@ RULES = (
     "'at 6 pm', 'tomorrow at 9 am'. Follow-ups ('what about Noida?', 'and tomorrow?', 'make it 5 minutes instead', "
     "'send the same to Riya') reuse the previous turn's command with the changed argument. "
     "NEVER state live data yourself (weather, temperature, air quality, news, calendar, email): always call the tool. "
+    "Use web_search for current events, prices, scores, match results, 'latest' or 'today' questions, who holds a "
+    "role now, and anything after your training data; not for maths, jokes, chat or settled facts. "
     "Don't ask which app to use for music: leave platform out unless the user names Spotify. Keep the user's own "
     "words for message texts. "
     "Otherwise (chat, questions, facts) call the reply tool with 1 or 2 short spoken sentences, no "

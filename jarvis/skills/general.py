@@ -53,7 +53,7 @@ CATEGORIES = {
     "apps": ("apps", {"apps", "app", "applications", "application", "websites", "website", "open apps"}),
     "laptop": ("laptop controls", {"laptop", "laptop controls", "controls", "computer", "pc", "system", "volume",
                                    "brightness", "battery", "media", "music", "screenshot", "shutdown", "shut down"}),
-    "web": ("web", {"web", "internet", "youtube", "google", "news", "search", "browser"}),
+    "web": ("web", {"web", "internet", "youtube", "google", "news", "search", "browser", "browse", "online"}),
     "notes": ("notes and reminders", {"notes and reminders", "notes", "note", "reminders", "reminder", "timers",
                                       "timer", "alarms"}),
     "whatsapp": ("WhatsApp", {"whatsapp", "whats app", "contacts", "messaging"}),

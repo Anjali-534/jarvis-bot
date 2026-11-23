@@ -212,7 +212,24 @@ Spotify only allows apps to control playback on **Premium** accounts. Without a 
 **Web**
 - "Play Arijit Singh songs", "play lofi beats on YouTube"
 - "Search lofi music on YouTube"
-- "Search best laptops under 60000", "google weather in Mumbai", "look up Python decorators"
+- "Open best laptops under 60000 in browser", "show me in Chrome": Google results in the browser
+
+**Web search, answered by voice** (no browser window)
+- "Search the web for the latest iPhone", "look up petrol price in Delhi today", "google Python decorators", "sensex internet pe dekho"
+- Questions about current events, prices, scores, "latest" or "today", and who holds a role now go to the web by themselves (through AI routing): "who won the match yesterday", "petrol price in Delhi today", "latest iPhone"
+- Follow-ups: "tell me more", "which website said that" / "source?", "open the first source" / "open that in Chrome", "search more about its battery life"
+
+How it works (`jarvis/skills/browse.py`):
+1. Jarvis says "Let me check online" and searches with the first available provider in `SEARCH_PROVIDER` (default `auto`):
+   - **Tavily**, if `TAVILY_API_KEY` is set (free tier at <https://app.tavily.com>): an answer plus the top 5 results with content.
+   - **Groq's web-search models** (`groq/compound-mini`, `groq/compound`), if your Groq key has them. Jarvis checks the model list once a day; the current free key doesn't.
+   - **Free, no key** (the `ddgs` package): the top 5 links, then the top 3 pages are read in parallel (4 s each; PDFs and paywalled sites are skipped) and their main text extracted with trafilatura.
+2. The sources are trimmed to about 1,500 words, keeping the paragraphs that mention your question, and sent to the AI with numbered sources and the rule "answer ONLY from these". The answer is 2 or 3 short sentences, gives the date for time-sensitive facts, and is spoken as it streams. Hindi or Hinglish questions get Hinglish answers in Roman letters.
+3. The answer and the numbered source titles and URLs are printed in the terminal.
+
+Searching and reading has an 8-second budget (`SEARCH_BUDGET`): pages that haven't loaded by then are replaced by their search snippets. Results are cached for 30 minutes (`SEARCH_CACHE_MINUTES`) in `data/cache.json`. The answer goes through the same AI as chat, so the Gemini backup covers Groq's rate limits. On this laptop a web answer takes about 6 to 12 seconds.
+
+Limits: sites that draw their numbers with JavaScript (live scores, stock tickers) often give no readable text, and then Jarvis says it couldn't find a reliable answer. It can only be as current as the pages the search returns.
 - "News", "news about cricket", "tech news"
 
 **Notes, reminders and timers**
@@ -269,7 +286,7 @@ jarvis/http.py          shared requests.Session with timeouts: get_json / get_te
 jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_from_command()
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")
 jarvis/skills/
-    __init__.py         imports skills IN ORDER: general, notes, gmail, calendar, spotify, system,
+    __init__.py         imports skills IN ORDER: general, notes, gmail, calendar, spotify, browse, system,
                         web, whatsapp, vscode, apps, weather, aqi, knowledge, ai
     general.py          exit, sleep, help, greetings, time, date, calculator, jokes
     notes.py            notes file, reminders, timers
@@ -278,7 +295,8 @@ jarvis/skills/
     spotify.py          play songs/liked songs/playlists, pause/skip, now playing, volume
     briefing.py         good morning briefing (parallel sections, 40 s budget, BRIEFING_TIME), good night
     system.py           volume, media, brightness, screenshot, battery, status, lock, power
-    web.py              YouTube, Google, Google News
+    web.py              YouTube, Google News
+    browse.py           web search answered by voice: search, read pages, answer from sources
     whatsapp.py         WhatsApp messages, calls, contacts (data/contacts.json)
     vscode.py           project registry, open in VS Code, git status/pull, run dev servers
     apps.py             open / close apps and websites

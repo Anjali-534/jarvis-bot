@@ -28,7 +28,7 @@ ROUTES = [
     ("red zones", "red zones"), ("which are the most polluted areas", "red zones"),
     ("my area is rohini", "set location"), ("i live in dwarka sector 10", "set location"), ("110085", "set location"),
     # tricky ones
-    ("quit chrome", "close"), ("close vs code", "close"), ("search pollution in delhi", "google"),
+    ("quit chrome", "close"), ("close vs code", "close"), ("search pollution in delhi", "web search"),
     ("cancel shutdown", "cancel shutdown"), ("turn off the lights", "ai"), ("what is python", "wikipedia"),
     # general
     ("exit", "exit"), ("goodbye", "exit"), ("bye jarvis", "exit"), ("go to sleep", "sleep"), ("help", "help"),
@@ -48,7 +48,7 @@ ROUTES = [
     ("turn off my computer", "power"), ("put the laptop to sleep", "sleep pc"),
     # web / apps
     ("play believer on youtube", "play youtube"), ("search lofi music on youtube", "youtube search"),
-    ("google weather in mumbai", "google"), ("news", "news"), ("news about cricket", "news"),
+    ("google weather in mumbai", "web search"), ("news", "news"), ("news about cricket", "news"),
     ("open chrome and notepad", "open"), ("open github.com", "open"),
     # weather / knowledge / ai
     ("what's the weather", "weather"), ("weather in mumbai tomorrow", "weather"), ("will it rain today", "rain"),
@@ -73,7 +73,7 @@ ROUTES = [
     ("read the email from dhruv", "read email"), ("what did dhruv email me", "read email"),
     ("search email for invoice", "search email"), ("search my gmail for flight tickets", "search email"),
     ("email dhruv saying the demo is at 5", "email draft"), ("write an email to riya about the trip", "email draft"),
-    ("send an email to mom", "email draft"), ("open gmail", "open"), ("search invoice", "google"),
+    ("send an email to mom", "email draft"), ("open gmail", "open"), ("search invoice", "web search"),
     # calendar
     ("what's on my calendar today", "calendar today"), ("what's on my calendar tomorrow", "calendar today"),
     ("what do i have on friday", "calendar today"), ("my meetings this week", "calendar today"),
@@ -106,7 +106,7 @@ def test_routing(recorded_skills, phrase, expected):
 def test_skill_order_cancel_shutdown_before_power():
     names = [s.name for s in router.SKILLS]
     assert names.index("cancel shutdown") < names.index("power")
-    assert names.index("google") < names.index("aqi")
+    assert names.index("web search") < names.index("aqi")
 
 
 # ---------------------------------------------------------------- wake word and locations

@@ -77,8 +77,15 @@ Live Indian CPCB AQI for any area or pincode. Jarvis remembers your area for the
 ## Web
 - "Play Arijit Singh songs" / "play lofi beats on YouTube"
 - "Search lofi music on YouTube"
-- "Search best laptops under 60000" / "google weather in Mumbai" / "look up Python decorators"
 - "News" / "news about cricket" / "tech news"
+
+## Web search (answered by voice)
+Jarvis searches, reads the top pages and answers in 2 or 3 sentences, with the date for prices, scores and news. The full answer and the numbered sources are printed in the terminal. If the pages don't clearly answer, it says "I couldn't find a reliable answer" instead of guessing.
+- "Search the web for the latest iPhone" / "look up petrol price in Delhi today" / "google Python decorators"
+- "Who won the match yesterday" / "who is the current CEO of Twitter" / "latest iPhone" (no "search" needed)
+- "Sensex internet pe dekho" / "aaj Delhi mein petrol ka rate kya hai" (answers in Hinglish)
+- Then: "tell me more" (a longer answer from the same pages), "which website said that" / "source?", "open the first source" / "open that in Chrome", "search more about its battery life"
+- "Open best laptops under 60000 in browser" / "show me in Chrome": opens Google results instead
 
 ## Notes and reminders
 - "Take a note buy milk" / "remember that the meeting is at 5"
@@ -163,6 +170,7 @@ You don't need the exact phrases above. If no command matches, the AI works out 
 | "is it going to be cold tomorrow" / "and tomorrow?" | tomorrow's weather |
 | "put on some chill music" | plays it on YouTube (or Spotify if you say so) |
 | "make it 5 minutes instead" (after a timer) | a new 5-minute timer |
+| "who won the match yesterday" / "petrol price in delhi today" | searches the web and answers |
 | "tell me a fun fact" | just answers |
 
 Anything that sends, deletes, shuts down or closes apps always asks first. Needs `AI_API_KEY`.
@@ -175,7 +183,7 @@ In Hindi mode you can give commands in natural Hindi. Jarvis rewrites them into 
 | "जार्विस, क्रोम खोलो" / "क्रोम और नोटपैड खोल दो" | open Chrome / open Chrome and Notepad |
 | "क्रोम बंद करो" | close Chrome |
 | "अरिजीत सिंह के गाने बजाओ" | play on YouTube |
-| "यूट्यूब पर लोफी म्यूज़िक सर्च करो" / "गूगल पर बेस्ट लैपटॉप सर्च करो" | search YouTube / Google |
+| "यूट्यूब पर लोफी म्यूज़िक सर्च करो" / "गूगल पर बेस्ट लैपटॉप सर्च करो" | search YouTube / search the web and answer |
 | "आवाज़ बढ़ाओ" / "आवाज़ कम करो" / "म्यूट करो" | volume up / down / mute |
 | "अगला गाना" / "गाना रोको" | next song / pause |
 | "अभी क्या टाइम है" / "आज की तारीख क्या है" | time / date |

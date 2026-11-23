@@ -251,6 +251,7 @@ def handle(ctx, command):
     command = re.sub(r"\s+", " ", (command or "").replace("﻿", "").strip().lower())
     if not command:
         return None
+    ctx.state["heard"] = command  # what was actually said (skills reached via the AI get an English command)
     if translit.has_devanagari(command):
         # Hindi mode: try the English rewrite first; chat that isn't a command reaches the AI unchanged
         rewritten = translit.normalize_command(command)

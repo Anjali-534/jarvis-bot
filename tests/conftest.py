@@ -75,6 +75,15 @@ def offline(monkeypatch, tmp_path):
 
     monkeypatch.setattr(ai_skill, "_switch_pending", False)
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")  # backup tests switch it on
+    from jarvis.skills import browse
+
+    for name in ("ddgs_text", "tavily_search", "download"):  # no real web search in tests
+        monkeypatch.setattr(browse, name, forbidden)
+    monkeypatch.setattr(browse.webbrowser, "open", forbidden)
+    monkeypatch.setattr(config, "SEARCH_PROVIDER", "auto")
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "")
+    monkeypatch.setattr(config, "SEARCH_BUDGET", 8.0)
+    monkeypatch.setattr(config, "SEARCH_CACHE_MINUTES", 30)
     monkeypatch.setattr(config, "GEMINI_MODEL", "gemini-3.5-flash-lite")
     monkeypatch.setattr(config, "GEMINI_ROUTER_TIMEOUT", 8.0)
     monkeypatch.setattr(ai_skill, "_on_backup", False)
