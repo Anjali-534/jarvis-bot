@@ -415,3 +415,17 @@ def test_restart_releases_lock_before_relaunch(fake_pystray, monkeypatch):
     app.on_restart()
     app.shutdown()
     assert order == ["release", "relaunch"]
+
+
+def test_console_logging_survives_emoji(tmp_path):
+    """An emoji in an email subject must not break the console (cp1252 on Windows)."""
+    import subprocess
+    import sys
+
+    code = ("import logging, config; from pathlib import Path; config.LOG_DIR = Path(r'%s'); "
+            "from jarvis.logs import setup_logging; setup_logging(console=True); "
+            "logging.getLogger('t').info('Party time \U0001f973 done')" % tmp_path)
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, cwd=str(config.BASE_DIR),
+                            env={**__import__("os").environ, "PYTHONIOENCODING": "cp1252"}, timeout=60)
+    assert b"Logging error" not in result.stderr and b"UnicodeEncodeError" not in result.stderr
+    assert b"Party time ? done" in result.stdout

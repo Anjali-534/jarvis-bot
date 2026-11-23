@@ -33,6 +33,10 @@ def setup_logging(console=None, level=logging.INFO):
     if console is None:
         console = sys.stdout is not None
     if console:
+        try:  # a Windows console can't show emoji (e.g. in email subjects): print "?" instead of a traceback
+            sys.stdout.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(logging.Formatter("%(message)s"))  # looks like the old print() output
         console_handler._jarvis = True
