@@ -440,7 +440,7 @@ def test_ai_with_key_keeps_history(monkeypatch):
     (401, "Invalid API Key", "My AI key was rejected. Please check AI_API_KEY in your .env file."),
     (400, '{"error": {"message": "API key not valid. Please pass a valid API key."}}', "My AI key was rejected"),
     (403, "", "My AI key was rejected"),
-    (404, "model not found", "The AI model test-model wasn't found. Please check AI_MODEL and AI_BASE_URL"),
+    (404, "model not found", "The AI model test model has been retired, and I couldn't find a replacement."),
     (429, "quota exceeded", "I've used up the free AI quota or hit the rate limit"),
     (503, "", "The AI service is having problems"),
     (400, "bad request", "The AI service returned an error, code 400."),
@@ -493,7 +493,7 @@ def test_every_skill_has_category_and_examples():
 def test_spoken_general_help_skips_housekeeping():
     ctx = make_ctx()
     handle(ctx, "help with general questions")
-    assert ctx.voice.said[0].startswith("For general questions, you can say: Switch to Hindi. What is 25 times 4.")
+    assert ctx.voice.said[0].startswith("For general questions, you can say: Switch to Hindi. Which AI model are you using.")
     assert "Goodbye" not in ctx.voice.said[0]
 
 

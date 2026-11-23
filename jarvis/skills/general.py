@@ -168,6 +168,17 @@ def language_skill(ctx, command, match):
     return "Okay, switched back to English."
 
 
+@skill("ai model", r"\b(?:which|what)\b.*\b(?:ai|llm|language)?\s*models?\b.*\b(?:using|use|running|are you)\b",
+       r"\bwhat(?:'s| is) your (?:ai |llm )?model\b", r"\bwhich ai (?:are you|is this)\b",
+       category="general", help=["which AI model are you using"])
+def ai_model(ctx, command, match):
+    from jarvis.skills import ai
+
+    if not config.AI_API_KEY:
+        return "No AI is set up yet. Add an AI_API_KEY to the .env file."
+    return f"I'm using {ai.provider_name()}, with the model {ai.spoken_model()}."
+
+
 # ---------------------------------------------------------------- small talk
 @skill("greet", r"^(?:hi|hii|hello|hey|hey there|hi there|hello there|yo|hola|namaste|namaskar|"
                 r"good (?:morning|afternoon|evening))(?:\s+jarvis)?$", category='general', help=['hello'])

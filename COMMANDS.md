@@ -142,6 +142,7 @@ Say "connect spotify" once first (setup steps are in the README). Playback contr
 - "Tell me a joke" / "who are you" / "how are you" / "thank you"
 - Anything else goes to the AI: "do you know Hindi", "write a 2 line poem about Delhi winters"
 - "Forget our conversation" (clears the AI's memory)
+- "Which AI model are you using" (if a model is retired, Jarvis switches to a newer one by itself and tells you once)
 - **Hindi / Hinglish:** talk to the AI in Hinglish and it replies in Hinglish, written in English letters so the voice can read it.
 - "Switch to Hindi" makes Jarvis listen for Hindi. "Switch to English" switches back. This lasts for the current session only.
 

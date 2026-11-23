@@ -61,6 +61,10 @@ AI_PROVIDER = _str("AI_PROVIDER").lower()
 AI_TIMEOUT = _int("AI_TIMEOUT", 15)
 # Reasoning models (Groq's gpt-oss / qwen3): "low" or "none" keeps answers fast. Empty: not sent.
 AI_REASONING_EFFORT = _str("AI_REASONING_EFFORT").lower()
+# If AI_MODEL is retired, switch to the first of these the provider still offers (then any chat model)
+AI_MODEL_FALLBACKS = [m.strip() for m in _str(
+    "AI_MODEL_FALLBACKS", "qwen/qwen3.8-27b,openai/gpt-oss-20b,openai/gpt-oss-120b").split(",") if m.strip()]
+ENV_FILE = BASE_DIR / ".env"  # Jarvis rewrites only its AI_MODEL line after switching models
 
 def _float(name, default):
     try:

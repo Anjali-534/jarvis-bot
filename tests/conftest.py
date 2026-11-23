@@ -65,6 +65,10 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "SPOTIFY_CLIENT_ID", "")
     monkeypatch.setattr(config, "CALENDAR_REMINDERS", True)
     monkeypatch.setattr(config, "CACHE_FILE", tmp_path / "data" / "cache.json")
+    monkeypatch.setattr(config, "ENV_FILE", tmp_path / ".env")  # never rewrite the real .env
+    from jarvis.skills import ai as ai_skill
+
+    monkeypatch.setattr(ai_skill, "_switch_pending", False)
     monkeypatch.setattr(config, "SAMPLES_DIR", tmp_path / "data" / "samples")
     monkeypatch.setattr(config, "ONE_SEC_AFTER", 0)   # tests that need "One sec." turn it on
     monkeypatch.setattr(config, "CALENDAR_REMINDER_MINUTES", 10)

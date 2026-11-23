@@ -319,7 +319,7 @@ def test_404_with_no_better_model(gemini, monkeypatch):
     responses.append(StreamResponse(status_code=404, text="not found"))
     ctx = make_ctx()
     handle(ctx, "hi there friend")
-    assert ctx.voice.last.startswith("The AI model gemini-2.5-flash wasn't found.")
+    assert ctx.voice.last.startswith("The AI model gemini 2.5 flash has been retired, and I couldn't find a replacement.")
 
 
 def test_gmail_summary_uses_short_non_streaming_call(gemini):

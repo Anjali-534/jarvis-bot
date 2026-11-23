@@ -5,7 +5,7 @@ from datetime import datetime
 
 import config
 from jarvis import http
-from jarvis.router import fallback, skill
+from jarvis.router import fallback, on_startup, skill
 
 log = logging.getLogger(__name__)
 
@@ -146,21 +146,8 @@ def _gemini_url(stream=False):
 
 
 def _gemini_request(payload, stream=False):
-    """POST to Gemini; on 404 (model retired) switch to the newest Flash model once and retry."""
     send = http.post_stream if stream else http.post_json
-    response = send(_gemini_url(stream), payload, headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
-    if response.status_code == 404:
-        try:
-            newest = pick_flash_model(list_gemini_models())
-        except Exception as exc:
-            log.warning("[ai] couldn't list Gemini models: %s", exc)
-            newest = None
-        if newest and newest != config.AI_MODEL:
-            log.warning("[ai] model %s not found, switching to %s (set AI_MODEL=%s in .env)",
-                        config.AI_MODEL, newest, newest)
-            config.AI_MODEL = newest
-            response = send(_gemini_url(stream), payload, headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
-    return response
+    return send(_gemini_url(stream), payload, headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
 
 
 def _gemini_body(system, history, command, max_tokens):
@@ -260,17 +247,160 @@ def stream_openai(system, history, command, max_tokens=SHORT_TOKENS):
     return 200, chunks()
 
 
+# ---------------------------------------------------------------- surviving model retirements
+SWITCHED = "I switched to a newer AI model."
+_RETIRED = re.compile(r"model_decommissioned|decommissioned|model_not_found|model[^\n]{0,80}(?:not found|does not "
+                      r"exist|is not supported|no longer)|not found for api version", re.IGNORECASE)
+_NOT_CHAT = re.compile(r"whisper|tts|orpheus|guard|embed|moderation|dall-e|image|audio|transcri|realtime|"
+                       r"rerank|search|vision-only", re.IGNORECASE)
+_switch_pending = False  # say SWITCHED once, with the next answer
+
+
+def is_retired(status, body):
+    """Does this error mean AI_MODEL no longer exists (rather than a bad key or a quota)?"""
+    if status in (401, 403, 429) or status < 400:
+        return False
+    return status == 404 or bool(_RETIRED.search(body or ""))
+
+
+def list_models():
+    """Model names the provider offers for chat right now, in the provider's order."""
+    if provider() == "gemini":
+        return [m["name"].removeprefix("models/") for m in list_gemini_models()
+                if "generateContent" in m.get("supportedGenerationMethods", [])]
+    data = http.get_json(f"{config.AI_BASE_URL}/models", headers=_openai_headers(), timeout=6)
+    return [m["id"] for m in data.get("data", []) if m.get("id") and m.get("active", True)]
+
+
+def choose_replacement(available, current):
+    """The first AI_MODEL_FALLBACKS entry on offer, else (Gemini) the newest Flash, else the first chat model."""
+    offered = set(available)
+    for name in config.AI_MODEL_FALLBACKS:
+        if name in offered and name != current:
+            return name
+    if provider() == "gemini":
+        flash = pick_flash_model([{"name": f"models/{n}", "supportedGenerationMethods": ["generateContent"]}
+                                  for n in available])
+        if flash and flash != current:
+            return flash
+    return next((n for n in available if n != current and not _NOT_CHAT.search(n)), None)
+
+
+def update_env_model(model, path=None):
+    """Rewrite only the AI_MODEL line of .env (append it if missing). Other lines, including keys, are untouched."""
+    path = path or config.ENV_FILE
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            text = fh.read()
+    except FileNotFoundError:
+        text = ""
+    line = re.compile(r"^(\s*AI_MODEL\s*=)[^\r\n]*", re.MULTILINE)
+    if line.search(text):
+        text = line.sub(lambda m: m.group(1) + model, text, count=1)
+    else:
+        newline = "\r\n" if "\r\n" in text else "\n"
+        text += ("" if not text or text.endswith(("\n", "\r")) else newline) + f"AI_MODEL={model}{newline}"
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+
+
+def recover_model():
+    """AI_MODEL was retired: pick a replacement, use it from now on, save it to .env. Returns it, or None."""
+    global _switch_pending
+    old = config.AI_MODEL
+    try:
+        replacement = choose_replacement(list_models(), old)
+    except Exception as exc:
+        log.warning("[ai] couldn't list the provider's models: %s", exc)
+        return None
+    if not replacement:
+        log.warning("[ai] model %s is retired and no replacement is available", old)
+        return None
+    log.warning("[ai] model %s is retired or unavailable, switching to %s (saved to .env)", old, replacement)
+    config.AI_MODEL = replacement
+    try:
+        update_env_model(replacement)
+    except OSError as exc:
+        log.warning("[ai] couldn't update AI_MODEL in .env: %s", exc)
+    from jarvis import cache
+
+    cache.put(_model_cache_key(), True)
+    _switch_pending = True
+    return replacement
+
+
+def _with_recovery(ask, *args):
+    status, result = ask(*args)
+    if status >= 400 and is_retired(status, result if isinstance(result, str) else "") and recover_model():
+        status, result = ask(*args)  # the same question once more, with the new model
+    return status, result
+
+
 def complete(system, history, command, max_tokens=SHORT_TOKENS):
     """Ask the configured AI. Returns (status, text): text is the reply, or the error body if status >= 400.
 
-    Raises Blocked if Gemini refused to answer.
+    Raises Blocked if Gemini refused to answer. A retired model is replaced automatically.
     """
-    return (ask_gemini if provider() == "gemini" else ask_openai)(system, history, command, max_tokens)
+    ask = ask_gemini if provider() == "gemini" else ask_openai
+    return _with_recovery(ask, system, history, command, max_tokens)
 
 
 def stream(system, history, command, max_tokens=SHORT_TOKENS):
     """Like complete(), but the reply comes back as an iterator of text chunks as they're generated."""
-    return (stream_gemini if provider() == "gemini" else stream_openai)(system, history, command, max_tokens)
+    ask = stream_gemini if provider() == "gemini" else stream_openai
+    return _with_recovery(ask, system, history, command, max_tokens)
+
+
+def _model_cache_key():
+    return f"ai-model-ok|{provider()}|{config.AI_BASE_URL}|{config.AI_MODEL}"
+
+
+MODEL_CHECK_SECONDS = 24 * 3600
+
+
+def check_model():
+    """Make sure AI_MODEL still exists (at most once a day); switch to a replacement if it doesn't.
+
+    Returns True if the model is fine, the new model's name if it switched, or None if it couldn't check.
+    """
+    from jarvis import cache
+
+    if not config.AI_API_KEY:
+        return None
+    if cache.get(_model_cache_key(), MODEL_CHECK_SECONDS):
+        return True
+    try:
+        available = list_models()
+    except Exception as exc:  # offline: try again next start
+        log.debug("[ai] model check skipped: %s", exc)
+        return None
+    if config.AI_MODEL in available:
+        cache.put(_model_cache_key(), True)
+        return True
+    return recover_model()
+
+
+@on_startup
+def _check_model_in_background(ctx):
+    import threading
+
+    if config.AI_API_KEY:
+        threading.Thread(target=check_model, name="ai-model-check", daemon=True).start()
+
+
+def provider_name():
+    if provider() == "gemini":
+        return "Google Gemini"
+    host = re.sub(r"^https?://(?:api\.)?", "", config.AI_BASE_URL).split("/")[0]
+    known = {"groq.com": "Groq", "openai.com": "OpenAI", "openrouter.ai": "OpenRouter", "mistral.ai": "Mistral",
+             "together.xyz": "Together"}
+    return next((label for domain, label in known.items() if host.endswith(domain)), host)
+
+
+def spoken_model(model=None):
+    """'qwen/qwen3.8-27b' -> 'qwen 3.8 27b' (easier to listen to)."""
+    name = (model or config.AI_MODEL).split("/")[-1]
+    return re.sub(r"(?<=[a-z])(?=\d)", " ", name.replace("-", " ")).strip()
 
 
 # ---------------------------------------------------------------- speaking as it streams
@@ -297,6 +427,14 @@ def sentences(chunks, min_length=MIN_SENTENCE):
         yield buffer.strip()
 
 
+def announce_switch(ctx):
+    """Say "I switched to a newer AI model." once after a switch."""
+    global _switch_pending
+    if _switch_pending:
+        _switch_pending = False
+        ctx.say(SWITCHED, wait=False)
+
+
 @fallback
 def ai(ctx, command, match=None):
     if not config.AI_API_KEY:
@@ -308,7 +446,11 @@ def ai(ctx, command, match=None):
         status, chunks = stream(system_prompt(), history, command, max_tokens_for(command))
         if status >= 400:
             log.warning("[ai] HTTP %s: %s", status, chunks[:300])
+            if is_retired(status, chunks):
+                return (f"The AI model {spoken_model()} has been retired, and I couldn't find a replacement. "
+                        "Please set AI_MODEL in the .env file to a current model.")
             return error_message(status, chunks)
+        announce_switch(ctx)
         for sentence in sentences(chunks):
             text = strip_markdown(sentence)
             if not text:

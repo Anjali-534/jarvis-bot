@@ -40,6 +40,14 @@ Free AI keys:
 
 **Groq** models change often: if Jarvis says the model wasn't found, check the current list at <https://console.groq.com/docs/models>. Reasoning models (`qwen/...`, `openai/gpt-oss-...`) answer faster with `AI_REASONING_EFFORT=none` (Qwen) or `low` (gpt-oss).
 
+**Retired models.** Providers retire models without warning. When that happens, Jarvis:
+- lists the provider's current models;
+- picks the first of `AI_MODEL_FALLBACKS` that's still offered (otherwise the newest Gemini Flash, or the first chat model);
+- asks your question again and says "I switched to a newer AI model" once;
+- rewrites only the `AI_MODEL` line of `.env` (your key is never read out or changed).
+
+It also checks in the background at startup, at most once a day, so the first question isn't the one that fails. Ask "which AI model are you using" to hear the provider and model.
+
 **Short, streamed answers.** The AI is asked for 1 or 2 short sentences (150 tokens) unless you say "explain in detail" (600 tokens). Replies are streamed: Jarvis starts speaking the first sentence while the rest is still being written. On this laptop, speaking is the slowest step, so long skill replies (help, news, calendar, email, notes, reminders, projects) speak 3 items and then ask "Want more?". Say yes to hear the next 3. The full list is always printed in the terminal.
 
 If the key is rejected, the model name is wrong, or the free quota runs out, Jarvis says so instead of failing silently. If Google rejects a key with `ACCESS_TOKEN_TYPE_UNSUPPORTED` or `API_KEY_SERVICE_BLOCKED`, the key isn't allowed to use the Gemini API: create one in AI Studio, or in Cloud Console allow the **Generative Language API** under the key's API restrictions.
