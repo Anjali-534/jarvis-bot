@@ -265,7 +265,7 @@ def create_draft(service, to, subject, body):
 @skill("email draft",
        rf"^(?:please\s+)?(?:send|write|draft|compose)\s+(?:an?\s+)?(?:new\s+)?{MAIL}\s+to\s+(.+)$",
        rf"^(?:please\s+)?(?:e-?\s?mail|mail)\s+(?!(?:from|to me)\b)(.+)$",
-       category="email", help=["email Dhruv saying the demo is at 5", "write an email to Riya about the trip"])
+       category="email", help=["email Dhruv saying the demo is at 5", "write an email to Riya about the trip"], params={"to": "contact name or email address", "message": "the email text", "subject?": "short subject"}, command="email {to}[ about {subject}] saying {message}", risky=True, confirms=True)
 @friendly_errors
 def email_draft(ctx, command, match):
     parsed = parse_compose(match.group(1))

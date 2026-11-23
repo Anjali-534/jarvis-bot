@@ -54,7 +54,7 @@ def _steps(command, default=5):
 
 
 @skill("volume up", r"\bvolume up\b", r"\b(?:increase|raise|turn up)\s+(?:the\s+)?volume\b", r"\bturn (?:it|the volume) up\b",
-       r"\blouder\b", r"\bvolume (?:higher|increase)\b", category='laptop', help=['volume up', 'volume up by 20'])
+       r"\blouder\b", r"\bvolume (?:higher|increase)\b", category='laptop', help=['volume up', 'volume up by 20'], tool="volume", also=("volume down", "mute"), params={"direction": ["up", "down", "mute"], "amount?": ("integer", "percent to change by, e.g. 20")}, command=lambda a: "mute" if a.get("direction") == "mute" else f"volume {a.get('direction', 'up')}" + (f" by {a['amount']}" if a.get("amount") else ""))
 @windows_only
 def volume_up(ctx, command, match):
     press("volumeup", _steps(command))
@@ -78,7 +78,7 @@ def mute(ctx, command, match):
 
 
 @skill("play pause", r"^(?:please\s+)?(?:pause|resume|unpause)(?:\s+(?:the\s+)?(?:music|song|video|media|playback|it))?$",
-       r"\bplay\s*pause\b", r"^(?:stop|pause) the (?:music|song|video)$", category='laptop', help=['pause the music', 'resume'])
+       r"\bplay\s*pause\b", r"^(?:stop|pause) the (?:music|song|video)$", category='laptop', help=['pause the music', 'resume'], tool="media", also=("next track", "previous track"), params={"action": ["pause", "resume", "next", "previous"]}, command=lambda a: {"pause": "pause the music", "resume": "resume", "next": "next song", "previous": "previous song"}.get(a.get("action")))
 @windows_only
 def play_pause(ctx, command, match):
     press("playpause")
@@ -205,7 +205,7 @@ def cancel_shutdown(ctx, command, match):
 @skill("power", rf"^(?:please\s+)?(?:shut\s?down|restart|reboot){DEVICE}(?:\s+(?:in|after)\s+.+)?$",
        r"\b(?:turn|power|switch)\s+off\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
        r"\bshut\s?down\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
-       r"\b(?:restart|reboot)\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b", category='laptop', help=['shut down the laptop', 'restart in 10 minutes'])
+       r"\b(?:restart|reboot)\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b", category='laptop', help=['shut down the laptop', 'restart in 10 minutes'], params={"action": ["shutdown", "restart"], "delay?": "e.g. 10 minutes"}, command=lambda a: ("shut down" if a.get("action") == "shutdown" else "restart") + " the laptop" + (f" in {a['delay']}" if a.get("delay") else ""), risky=True, confirms=True)
 @windows_only
 def power(ctx, command, match):
     restart = bool(re.search(r"\b(?:restart|reboot)\b", command))

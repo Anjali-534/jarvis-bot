@@ -66,6 +66,7 @@ AI_MODEL_FALLBACKS = [m.strip() for m in _str(
     "AI_MODEL_FALLBACKS", "qwen/qwen3.8-27b,openai/gpt-oss-20b,openai/gpt-oss-120b").split(",") if m.strip()]
 ENV_FILE = BASE_DIR / ".env"  # Jarvis rewrites only its AI_MODEL line after switching models
 
+
 def _float(name, default):
     try:
         return float(os.getenv(name, "").strip())
@@ -120,3 +121,8 @@ BRIEFING_SECTIONS = [s.strip().lower() for s in _str(
 BRIEFING_TIME = _str("BRIEFING_TIME")           # HH:MM: brief me automatically once a day when idle; empty = off
 BRIEFING_MUSIC = _str("BRIEFING_MUSIC")         # e.g. "lofi beats": played on Spotify after the briefing
 SAMPLES_DIR = _path("SAMPLES_DIR", "data/samples")       # "record samples" saves WAVs here for the benchmark
+
+# Natural-language actions: when no command pattern matches, the AI may pick a skill (tool calling)
+AI_ROUTING = _bool("AI_ROUTING", True)
+AI_ROUTER_MODEL = _str("AI_ROUTER_MODEL")             # empty = AI_MODEL
+AI_ROUTER_TIMEOUT = _float("AI_ROUTER_TIMEOUT", 4.0)  # seconds; on timeout it's treated as normal chat

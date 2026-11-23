@@ -151,6 +151,22 @@ Say "connect spotify" once first (setup steps are in the README). Playback contr
 - **Hindi / Hinglish:** talk to the AI in Hinglish and it replies in Hinglish, written in English letters so the voice can read it.
 - "Switch to Hindi" makes Jarvis listen for Hindi. "Switch to English" switches back. This lasts for the current session only.
 
+## Say it your way
+You don't need the exact phrases above. If no command matches, the AI works out the action and Jarvis prints what it understood:
+
+| You say | Jarvis does |
+|---|---|
+| "yaar thoda sound badha do" / "I can't hear anything" | volume up |
+| "ping Dhruv that I'm running late" | WhatsApp Dhruv (asks first) |
+| "kal subah 9 baje yaad dilana gym jaana hai" | reminder tomorrow at 9 AM |
+| "how's the air outside" / then "what about Gurgaon?" | AQI, then AQI in Gurgaon |
+| "is it going to be cold tomorrow" / "and tomorrow?" | tomorrow's weather |
+| "put on some chill music" | plays it on YouTube (or Spotify if you say so) |
+| "make it 5 minutes instead" (after a timer) | a new 5-minute timer |
+| "tell me a fun fact" | just answers |
+
+Anything that sends, deletes, shuts down or closes apps always asks first. Needs `AI_API_KEY`.
+
 ## Hindi commands (after "switch to Hindi")
 In Hindi mode you can give commands in natural Hindi. Jarvis rewrites them into English and prints what it understood, for example `(understood as: open chrome)`. Messages, notes and reminder texts are kept exactly as you said them. Anything that isn't a command goes to the AI unchanged, so you can chat in Hindi too.
 

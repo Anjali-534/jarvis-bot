@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 import config
 from jarvis import notify
 from jarvis.router import skill, speak_list
-from jarvis.timeparse import find_clock, find_duration, say_clock, say_duration
+from jarvis.timeparse import (
+    clock_parts, find_clock, find_datetime, find_day, find_duration, remove_spans, say_clock, say_day, say_duration,
+)
 
 
 # ---------------------------------------------------------------- notes
@@ -55,7 +57,7 @@ def read_notes_skill(ctx, command, match):
 
 
 @skill("take note", r"\b(?:take|make|write|add|create)\s+(?:a\s+|down\s+a\s+|this\s+)?note(?:\s+(?:that|saying|of))?\s*:?\s*(.*)$",
-       r"\bnote (?:down|this|that)\s*:?\s*(.*)$", r"^remember (?:that\s+)?(.+)$", r"\bremember that\s+(.+)$", category='notes', help=['take a note buy milk', 'remember that the meeting is at 5'])
+       r"\bnote (?:down|this|that)\s*:?\s*(.*)$", r"^remember (?:that\s+)?(.+)$", r"\bremember that\s+(.+)$", category='notes', help=['take a note buy milk', 'remember that the meeting is at 5'], params={"text": "what to note down"}, command="take a note {text}")
 def take_note(ctx, command, match):
     text = match.group(1).strip(" .:")
     if not text:
@@ -109,6 +111,12 @@ def parse_when(text, now=None):
     if found:
         seconds, start, end = found
         return seconds, text[:start] + " " + text[end:], f"in {say_duration(seconds)}"
+    day = find_day(text, now)
+    if day and clock_parts(text):  # "tomorrow at 9 am", "on friday at 6"
+        moment, _, spans = find_datetime(text, now)
+        if moment > now:
+            return (max(1, (moment - now).total_seconds()), remove_spans(text, spans),
+                    f"{say_day(moment, now)} at {say_clock(moment, moment)}")
     clock = find_clock(text, now)
     if clock:
         moment, start, end = clock
@@ -148,7 +156,7 @@ def list_reminders(ctx, command, match):
     return speak_list(ctx, f"You have {len(active)} active:", items, join="; ".join)
 
 
-@skill("timer", r"\b(?:set|start)\s+(?:a\s+|an\s+)?timer\b(.*)$", r"\btimer for\b(.*)$", r"^(.+?)\s+timer$", category='notes', help=['set a timer for 5 minutes'])
+@skill("timer", r"\b(?:set|start)\s+(?:a\s+|an\s+)?timer\b(.*)$", r"\btimer for\b(.*)$", r"^(.+?)\s+timer$", category='notes', help=['set a timer for 5 minutes'], params={"duration": "how long, e.g. 5 minutes"}, command="set a timer for {duration}")
 def timer_skill(ctx, command, match):
     seconds = find_duration(match.group(1))
     if not seconds:
@@ -161,7 +169,7 @@ def timer_skill(ctx, command, match):
     return f"Timer set for {say_duration(seconds)}."
 
 
-@skill("reminder", r"\bremind me\b(.*)$", r"\bset (?:a\s+)?reminder\b(.*)$", category='notes', help=['remind me in 10 minutes to drink water', 'remind me at 6 pm to call mom'])
+@skill("reminder", r"\bremind me\b(.*)$", r"\bset (?:a\s+)?reminder\b(.*)$", category='notes', help=['remind me in 10 minutes to drink water', 'remind me at 6 pm to call mom'], params={"when": "when, e.g. 'in 10 minutes', 'at 6 pm', 'tomorrow at 9 am'", "message": "what to remind about, in English"}, command="remind me {when} to {message}")
 def reminder_skill(ctx, command, match):
     seconds, rest, when = parse_when(match.group(1))
     if seconds is None:

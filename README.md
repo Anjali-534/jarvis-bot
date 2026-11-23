@@ -48,6 +48,14 @@ Free AI keys:
 
 It also checks in the background at startup, at most once a day, so the first question isn't the one that fails. Ask "which AI model are you using" to hear the provider and model.
 
+**Natural language for actions.** You don't have to use exact phrasings. When no command pattern matches, Jarvis sends what you said to the AI with a list of actions (tool calling), generated from the skills that declare `params=`: volume, media, play music, open and close apps, reminders, timers, notes, weather, air quality, WhatsApp, email drafts, calendar add and cancel, shutdown and restart, git pull and running projects.
+- If the AI picks an action, its arguments become a normal command that runs through the usual skill, so every existing check still applies. "kal subah 9 baje yaad dilana gym jaana hai" becomes `(understood as: remind me tomorrow at 9 am to gym jaana hai)`.
+- The AI can only reach those registered skills, and anything that sends, deletes or shuts down always asks first.
+- Otherwise it answers as normal chat.
+- The last 3 turns are included, so follow-ups work: "what about Gurgaon?", "and tomorrow?", "make it 5 minutes instead", "send the same to Riya".
+
+The AI is only asked when no pattern matches. The request times out after 4 seconds (`AI_ROUTER_TIMEOUT`), you can use a separate model (`AI_ROUTER_MODEL`), identical phrases are cached for the session, and `AI_ROUTING=false` turns it off. On Groq's free tier (8,000 tokens a minute), a routed command costs about 2,000 tokens, so about 4 natural-language commands a minute. Exact phrasings like "volume up" don't use the AI at all.
+
 **Short, streamed answers.** The AI is asked for 1 or 2 short sentences (150 tokens) unless you say "explain in detail" (600 tokens). Replies are streamed: Jarvis starts speaking the first sentence while the rest is still being written. On this laptop, speaking is the slowest step, so long skill replies (help, news, calendar, email, notes, reminders, projects) speak 3 items and then ask "Want more?". Say yes to hear the next 3. The full list is always printed in the terminal.
 
 If the key is rejected, the model name is wrong, or the free quota runs out, Jarvis says so instead of failing silently. If Google rejects a key with `ACCESS_TOKEN_TYPE_UNSUPPORTED` or `API_KEY_SERVICE_BLOCKED`, the key isn't allowed to use the Gemini API: create one in AI Studio, or in Cloud Console allow the **Generative Language API** under the key's API restrictions.
@@ -307,6 +315,15 @@ from jarvis.router import skill
 def coin_flip(ctx, command, match):
     return f"It's {random.choice(['heads', 'tails'])}."
 ```
+
+To let the AI pick your skill from natural language, give it `params=` and `command=`:
+
+```python
+@skill("timer", r"\bset (?:a )?timer\b(.*)$", help="set a timer for 5 minutes",
+       params={"duration": "how long, e.g. 5 minutes"}, command="set a timer for {duration}")
+```
+
+`params` maps each argument to a description, a list of allowed values, or `("integer", "description")`; a trailing `?` marks it optional. `command` is a template (`"weather[ in {place}][ {day}]"`: bracketed parts are dropped when their argument is missing) or a function of the arguments. It must produce a phrase your own patterns match. Mark anything that sends, deletes or shuts down with `risky=True` (add `confirms=True` if the skill already asks). Keep the tool list small: it's sent with every routed command, and free AI tiers count tokens.
 
 Then add `coin` to the import list in `jarvis/skills/__init__.py`. Order matters, because the first matching skill wins: a skill whose phrases start with "play" must come **before** `web`, or YouTube takes them (that's why `spotify` does). Integrations normally go before `apps`, and always before `knowledge` and `ai`. Add its phrases to the `ROUTES` table in `tests/test_jarvis.py`, and replace side effects (launching, keypresses, subprocess calls) with small module functions that `tests/conftest.py` can stub out.
 

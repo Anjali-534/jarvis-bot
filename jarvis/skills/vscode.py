@@ -293,7 +293,7 @@ def git_status(ctx, command, match):
 
 
 @skill("git pull", r"^(?:please\s+)?(?:git\s+)?pull\s+(?:the\s+latest\s+(?:changes\s+)?(?:for|in|into)\s+)?(?:the\s+|my\s+)?(.+?)"
-                   r"(?:\s+(?:project|repo))?(?:\s+from\s+(?:github|origin|remote))?$", category='vs code', help=['pull jarvis'])
+                   r"(?:\s+(?:project|repo))?(?:\s+from\s+(?:github|origin|remote))?$", category='vs code', help=['pull jarvis'], params={"project": "project name"}, command="pull {project}", risky=True, confirms=True)
 def git_pull(ctx, command, match):
     found = resolve_project(ctx, match.group(1), required=False)
     if found is None:
@@ -314,7 +314,7 @@ def git_pull(ctx, command, match):
 
 
 @skill("run project", r"^(?:please\s+)?(?:run|start|launch)\s+(?:the\s+|my\s+)?(.+?)\s+(?:project|app|server|dev server)$",
-       r"^(?:please\s+)?run\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['run bogie backend'])
+       r"^(?:please\s+)?run\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['run bogie backend'], params={"project": "project name"}, command="run {project}", risky=True, confirms=True)
 def run_project(ctx, command, match):
     found = resolve_project(ctx, match.group(1), required=False)
     if found is None:

@@ -208,7 +208,7 @@ def create_event(service, title, start, minutes):
        rf"^(?:please\s+)?{_VERB}\s+.+\b(?:to|on|in|into)\s+(?:my\s+|the\s+)?calendar$",
        r"^(?:please\s+)?schedule\s+(?!(?:a\s+)?(?:shut\s?down|restart|reminder|timer)\b).+$",
        category="calendar", help=["add meeting with Dhruv tomorrow at 5 pm for 30 minutes",
-                                  "schedule dentist on Monday at 11"])
+                                  "schedule dentist on Monday at 11"], tool="calendar_add", params={"title": "what the event is", "when": "day and time, e.g. tomorrow at 5 pm", "duration?": "e.g. 30 minutes"}, command="schedule {title} {when}[ for {duration}]", risky=True, confirms=True)
 @friendly_errors
 def add_event(ctx, command, match):
     current = now()
@@ -270,7 +270,7 @@ def find_to_cancel(service, command, current):
 
 @skill("cancel event", rf"\b(?:cancel|delete|remove|drop|call off)\b.*\b{EVENT}s?\b",
        rf"\b(?:cancel|delete|remove)\b.*\b(?:from|on|in)\s+(?:my\s+)?calendar\b",
-       category="calendar", help=["cancel my 5 pm meeting"])
+       category="calendar", help=["cancel my 5 pm meeting"], tool="calendar_cancel", params={"event": "which event, e.g. my 5 pm meeting"}, command=lambda a: f"cancel {a['event']}" + ("" if re.search(r"\b(?:meeting|event|appointment|call)\b", a["event"]) else " meeting"), risky=True, confirms=True)
 @friendly_errors
 def cancel_event(ctx, command, match):
     current = now()

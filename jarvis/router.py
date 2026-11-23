@@ -22,6 +22,13 @@ class Skill:
     handler: Callable
     examples: list = field(default_factory=list)  # example phrases for help and COMMANDS.md
     category: str | None = None                   # a key of jarvis.skills.general.CATEGORIES
+    # AI tool calling (jarvis.intent): set params to expose this skill as a tool the AI can pick
+    params: dict | None = None    # {"place?": "city or area", "day?": ["today", "tomorrow"]}; "?" = optional
+    command: object = None        # template "weather[ in {place}][ {day}]" or fn(args) -> canonical command
+    tool: str | None = None       # tool name (default: the skill name)
+    also: tuple = ()              # other skills this tool's commands may land on (e.g. volume down, mute)
+    risky: bool = False           # always confirm before running when the AI picked it
+    confirms: bool = False        # the skill already asks for confirmation itself
 
 
 SKILLS: list[Skill] = []
@@ -32,16 +39,22 @@ class SpokenError(Exception):
     """Raise from a skill to stop it and speak a friendly message."""
 
 
-def skill(name, *patterns, help=(), category=None):
+def skill(name, *patterns, help=(), category=None, params=None, command=None, tool=None, also=(), risky=False,
+          confirms=False):
     """Register a skill triggered by any of the regex patterns (case-insensitive).
 
     help: an example phrase, or a list of them, shown by "help" / "help with <category>".
     category: which help category the skill belongs to.
+    params / command: expose the skill to the AI as a tool (see jarvis.intent). params maps argument names to a
+        description, a list of allowed values, or ("integer", description); a trailing "?" marks it optional.
+        command turns the AI's arguments back into a phrase this skill understands.
+    risky: confirm before running when the AI chose it (confirms=True if the skill already asks).
     """
     examples = [help] if isinstance(help, str) and help else list(help)
 
     def decorator(fn):
-        SKILLS.append(Skill(name, [re.compile(p, re.IGNORECASE) for p in patterns], fn, examples, category))
+        SKILLS.append(Skill(name, [re.compile(p, re.IGNORECASE) for p in patterns], fn, examples, category,
+                            params, command or (name if params == {} else None), tool, tuple(also), risky, confirms))
         return fn
 
     return decorator
@@ -113,6 +126,8 @@ class Context:
             pending, self._one_sec = self._one_sec, None
             if pending is not None and text != ONE_SEC:
                 pending.cancel()  # the skill spoke in time
+            if text != ONE_SEC:
+                self.state["last_said"] = text
             self.voice.speak(text, wait=wait)
 
     def ask(self, prompt):
@@ -231,11 +246,29 @@ def handle(ctx, command):
             handled = _try_skills(ctx, rewritten)
             if handled:
                 return handled
+    ctx.state.pop("last_said", None)
+    ctx.state.pop("understood", None)
     handled = _try_skills(ctx, command)
+    if not handled and FALLBACK is not None:
+        from jarvis import intent
+
+        handled = intent.resolve(ctx, command)  # natural language -> a registered skill, or a direct AI answer
+        if not handled:
+            result = _run(ctx, FALLBACK, command, None)
+            handled = _deliver(ctx, FALLBACK, result or "")
     if handled:
+        remember_turn(ctx, command, handled)
         return handled
-    if FALLBACK is not None:
-        result = _run(ctx, FALLBACK, command, None)
-        return _deliver(ctx, FALLBACK, result or "")
     ctx.say("Sorry, I don't know how to do that yet.")
     return None
+
+
+MAX_TURNS_REMEMBERED = 3
+
+
+def remember_turn(ctx, command, skill_name):
+    """Keep the last 3 turns so the AI can resolve follow-ups ("what about Noida?", "and tomorrow?")."""
+    turns = ctx.state.setdefault("turns", [])
+    turns.append({"you": command, "understood": ctx.state.get("understood") or command, "skill": skill_name,
+                  "jarvis": (ctx.state.get("last_said") or "")[:200]})
+    del turns[:-MAX_TURNS_REMEMBERED]

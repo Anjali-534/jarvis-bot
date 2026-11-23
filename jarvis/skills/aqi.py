@@ -243,7 +243,7 @@ def safe_outside(ctx, command, match):
 
 
 @skill("aqi", r"\ba\.?\s?q\.?\s?i\b", r"\bair quality\b", r"\bpollution\b", r"\bsmog\b", r"\bhow is the air\b",
-       r"\bair index\b", category='air quality', help=["what's the AQI", 'air quality in Noida'])
+       r"\bair index\b", category='air quality', help=["what's the AQI", 'air quality in Noida'], tool="air_quality", also=("pm2.5", "pm10", "no2"), params={"place?": "area, city or pincode in India", "pollutant?": ["aqi", "pm2.5", "pm10", "no2"]}, command=lambda a: a.get("pollutant", "aqi") + (f" in {a['place']}" if a.get("place") else ""))
 def aqi_skill(ctx, command, match):
     reading = reading_for(ctx, command)
     return f"{summary(reading)} The main pollutant is {SPOKEN[reading.dominant]}. {reading.advice}"

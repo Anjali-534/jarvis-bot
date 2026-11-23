@@ -216,7 +216,7 @@ def call_contact(ctx, command, match):
 
 
 @skill("whatsapp message", rf"^(?:please\s+)?(?:send|write|message|text|msg|tell)\b.*\b{WA}\b",
-       rf"^(?:please\s+)?{WA}\s+\S", category='whatsapp', help=["send a WhatsApp to mom saying I'll be late", 'message Dhruv on WhatsApp that the demo is at 5', 'WhatsApp mom'])
+       rf"^(?:please\s+)?{WA}\s+\S", category='whatsapp', help=["send a WhatsApp to mom saying I'll be late", 'message Dhruv on WhatsApp that the demo is at 5', 'WhatsApp mom'], params={"contact": "contact name", "message": "the message text"}, command="send a whatsapp to {contact} saying {message}", risky=True, confirms=True)
 def send_message(ctx, command, match):
     parsed = parse_message_command(command)
     if not parsed:

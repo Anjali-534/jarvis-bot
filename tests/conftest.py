@@ -66,6 +66,8 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CALENDAR_REMINDERS", True)
     monkeypatch.setattr(config, "CACHE_FILE", tmp_path / "data" / "cache.json")
     monkeypatch.setattr(config, "ENV_FILE", tmp_path / ".env")
+    monkeypatch.setattr(config, "AI_ROUTING", False)  # intent tests switch it on
+    monkeypatch.setattr(config, "AI_ROUTER_MODEL", "")
     monkeypatch.setattr(config, "BRIEFING_TIME", "")
     monkeypatch.setattr(config, "BRIEFING_MUSIC", "")
     monkeypatch.setattr(config, "BRIEFING_SECTIONS", ["weather", "aqi", "calendar", "email", "reminders", "news"])  # never rewrite the real .env

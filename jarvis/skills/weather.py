@@ -60,7 +60,7 @@ def rain(ctx, command, match):
 
 
 @skill("weather", r"\bweather\b", r"\btemperature\b", r"\bforecast\b", r"\bhow (?:hot|cold|humid) is it\b",
-       r"\bis it (?:hot|cold|humid)\b", category='time and weather', help=["what's the weather", 'weather in Mumbai tomorrow'])
+       r"\bis it (?:hot|cold|humid)\b", category='time and weather', help=["what's the weather", 'weather in Mumbai tomorrow'], params={"place?": "city or area", "day?": ["today", "tomorrow"]}, command="weather[ in {place}][ {day}]")
 def weather(ctx, command, match):
     place = geo.current_place(ctx, command)
     data = forecast(place)

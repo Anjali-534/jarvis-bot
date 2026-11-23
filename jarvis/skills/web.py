@@ -22,7 +22,7 @@ def find_youtube_video(query):
     return found.group(1) if found else None
 
 
-@skill("play youtube", r"^(?:please\s+)?play\s+(.+?)(?:\s+(?:on|in|from)\s+youtube)?$", category='web', help=['play Arijit Singh songs', 'play lofi beats on YouTube'])
+@skill("play youtube", r"^(?:please\s+)?play\s+(.+?)(?:\s+(?:on|in|from)\s+youtube)?$", category='web', help=['play Arijit Singh songs', 'play lofi beats on YouTube'], tool="play", also=("spotify play", "spotify playlist", "spotify liked songs"), params={"query": "song, artist, genre or mood to play, e.g. chill lofi music", "platform?": ["youtube", "spotify"]}, command=lambda a: f"play {a['query']}" + (" on spotify" if a.get("platform") == "spotify" else ""))
 def play_youtube(ctx, command, match):
     query = match.group(1).strip()
     try:

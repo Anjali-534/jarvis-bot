@@ -100,7 +100,7 @@ def open_target(name):
     return f"{key} from the Start menu"
 
 
-@skill("open", r"^(?:please\s+)?(?:open|launch|start|run)\s+(?:up\s+)?(.+)$", category='apps', help=['open Chrome', 'open VS Code and Notepad', 'open GitHub'])
+@skill("open", r"^(?:please\s+)?(?:open|launch|start|run)\s+(?:up\s+)?(.+)$", category='apps', help=['open Chrome', 'open VS Code and Notepad', 'open GitHub'], params={"target": "app or website, e.g. chrome, notepad, github"}, command="open {target}")
 def open_skill(ctx, command, match):
     opened = [open_target(name) for name in split_targets(match.group(1))]
     if not opened:
@@ -112,7 +112,7 @@ def kill(image):
     return system.run(["taskkill", "/IM", image, "/F"])
 
 
-@skill("close", r"^(?:please\s+)?(?:close|quit|exit|kill|terminate)\s+(?:the\s+|my\s+)?(.+)$", category='apps', help=['close Chrome', 'close this tab'])
+@skill("close", r"^(?:please\s+)?(?:close|quit|exit|kill|terminate)\s+(?:the\s+|my\s+)?(.+)$", category='apps', help=['close Chrome', 'close this tab'], params={"target": "app to close, e.g. chrome"}, command="close {target}", risky=True)
 def close_skill(ctx, command, match):
     target = match.group(1).strip(" .")
     if re.fullmatch(r"(?:jarvis|yourself|you)", target):
