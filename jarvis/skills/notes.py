@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import config
 from jarvis import notify
-from jarvis.router import skill
+from jarvis.router import skill, speak_list
 from jarvis.timeparse import find_clock, find_duration, say_clock, say_duration
 
 
@@ -49,10 +49,9 @@ def read_notes_skill(ctx, command, match):
         return "You don't have any notes yet. Say take a note to add one."
     if len(notes) == 1:
         return f"You have 1 note: {notes[0]}."
-    latest = list(reversed(notes[-5:]))
-    spoken = ". ".join(f"{i}: {text}" for i, text in enumerate(latest, 1))
-    intro = f"You have {len(notes)} notes." + (" Here are the latest 5." if len(notes) > 5 else "")
-    return f"{intro} {spoken}."
+    latest = list(reversed(notes))  # newest first
+    items = [f"{i}: {text}" for i, text in enumerate(latest, 1)]
+    return speak_list(ctx, f"You have {len(notes)} notes.", items, join=". ".join)
 
 
 @skill("take note", r"\b(?:take|make|write|add|create)\s+(?:a\s+|down\s+a\s+|this\s+)?note(?:\s+(?:that|saying|of))?\s*:?\s*(.*)$",
@@ -146,7 +145,7 @@ def list_reminders(ctx, command, match):
     items = [
         (f"a {e['text']} timer" if e["kind"] == "timer" else e["text"]) + f" at {say_clock(e['when'])}" for e in active
     ]
-    return f"You have {len(active)} active: " + "; ".join(items) + "."
+    return speak_list(ctx, f"You have {len(active)} active:", items, join="; ".join)
 
 
 @skill("timer", r"\b(?:set|start)\s+(?:a\s+|an\s+)?timer\b(.*)$", r"\btimer for\b(.*)$", r"^(.+?)\s+timer$", category='notes', help=['set a timer for 5 minutes'])

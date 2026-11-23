@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 
 import config
-from jarvis.router import skill
+from jarvis.router import skill, speak_list
 from jarvis.timeparse import NUMBER_WORDS
 
 log = logging.getLogger(__name__)
@@ -126,9 +126,9 @@ def help_category(ctx, command, match):
     if key is None:
         return None  # "help me write an email" goes to the AI
     title = CATEGORIES[key][0]
-    examples = [e[:1].upper() + e[1:] for e in examples_for(key, limit=6, spoken=True)]
+    examples = [e[:1].upper() + e[1:] for e in examples_for(key, spoken=True)]
     log.info(f"\n{title[:1].upper()}{title[1:]}:\n" + "\n".join(f'  - "{e}"' for e in examples_for(key)) + "\n")
-    return f"For {title}, you can say: " + ". ".join(examples) + "."
+    return speak_list(ctx, f"For {title}, you can say:", examples, join=". ".join, print_full=False)
 
 
 @skill("help", r"^(?:help|help me|commands|options|menu)$", r"\bwhat (?:all |else )?can you do\b",

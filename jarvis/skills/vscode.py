@@ -13,7 +13,7 @@ import subprocess
 from pathlib import Path
 
 import config
-from jarvis.router import SpokenError, skill
+from jarvis.router import SpokenError, skill, speak_list
 
 log = logging.getLogger(__name__)
 
@@ -270,10 +270,7 @@ def list_projects(ctx, command, match):
         return ("I didn't find any projects. Set PROJECT_ROOTS in the .env file, "
                 "or add aliases to data slash projects dot json.")
     names = sorted(projects)
-    count = f"You have {len(names)} project{'s' if len(names) != 1 else ''}"
-    shown = names[:8]
-    more = f", and {len(names) - 8} more" if len(names) > 8 else ""
-    return f"{count}: {say_list(shown)}{more}."
+    return speak_list(ctx, f"You have {len(names)} project{'s' if len(names) != 1 else ''}:", names)
 
 
 @skill("vscode rescan", r"\b(?:rescan|re scan|refresh|reload|scan)\b.*\bprojects?\b", category='vs code', help=['rescan projects'])

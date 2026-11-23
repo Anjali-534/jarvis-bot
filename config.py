@@ -59,6 +59,8 @@ AI_MODEL = _str("AI_MODEL", "gpt-4o-mini")
 # Empty: gemini if AI_BASE_URL is a generativelanguage.googleapis.com URL, otherwise openai.
 AI_PROVIDER = _str("AI_PROVIDER").lower()
 AI_TIMEOUT = _int("AI_TIMEOUT", 15)
+# Reasoning models (Groq's gpt-oss / qwen3): "low" or "none" keeps answers fast. Empty: not sent.
+AI_REASONING_EFFORT = _str("AI_REASONING_EFFORT").lower()
 
 def _float(name, default):
     try:

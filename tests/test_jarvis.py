@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta
 
 import pytest
-from helpers import FakeVoice, make_ctx
+from helpers import FakeVoice, StreamResponse, make_ctx, openai_stream
 
 import config
 from jarvis import geo, http, router
@@ -425,19 +425,13 @@ def test_ai_without_key(monkeypatch):
 def test_ai_with_key_keeps_history(monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
 
-    class Response:
-        status_code = 200
-
-        @staticmethod
-        def json():
-            return {"choices": [{"message": {"content": "**Sure!** Here's a `tip`."}}]}
-
     sent = []
-    monkeypatch.setattr(http, "post_json", lambda url, payload, **k: sent.append(payload) or Response())
+    monkeypatch.setattr(http, "post_stream",
+                        lambda url, payload, **k: sent.append(payload) or openai_stream("**Sure!** Here's a `tip`."))
     ctx = make_ctx()
     handle(ctx, "give me a study tip")
     assert ctx.voice.last == "Sure! Here's a tip."
-    assert len(ctx.state["ai_history"]) == 2 and sent[0]["max_tokens"] == 300
+    assert len(ctx.state["ai_history"]) == 2 and sent[0]["max_tokens"] == 150 and sent[0]["stream"] is True
     handle(ctx, "forget our conversation")
     assert ctx.state["ai_history"] == []
 
@@ -455,11 +449,7 @@ def test_ai_error_messages(monkeypatch, status, body, expected):
     monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
     monkeypatch.setattr(config, "AI_MODEL", "test-model")
 
-    class Response:
-        status_code = status
-        text = body
-
-    monkeypatch.setattr(http, "post_json", lambda *a, **k: Response())
+    monkeypatch.setattr(http, "post_stream", lambda *a, **k: StreamResponse(status_code=status, text=body))
     ctx = make_ctx()
     handle(ctx, "tell me something interesting")
     assert ctx.voice.last.startswith(expected)
@@ -471,14 +461,8 @@ def test_ai_prompt_asks_for_roman_hinglish(monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "sk-test")
     sent = []
 
-    class Response:
-        status_code = 200
-
-        @staticmethod
-        def json():
-            return {"choices": [{"message": {"content": "Haan, bilkul!"}}]}
-
-    monkeypatch.setattr(http, "post_json", lambda url, payload, **k: sent.append(payload) or Response())
+    monkeypatch.setattr(http, "post_stream",
+                        lambda url, payload, **k: sent.append(payload) or openai_stream("Haan, bilkul!"))
     ctx = make_ctx()
     handle(ctx, "kya tum hindi samajh sakte ho")
     system_prompt = sent[0]["messages"][0]["content"]
@@ -509,8 +493,8 @@ def test_every_skill_has_category_and_examples():
 def test_spoken_general_help_skips_housekeeping():
     ctx = make_ctx()
     handle(ctx, "help with general questions")
-    assert ctx.voice.last.startswith("For general questions, you can say: Switch to Hindi. What is 25 times 4.")
-    assert "Goodbye" not in ctx.voice.last
+    assert ctx.voice.said[0].startswith("For general questions, you can say: Switch to Hindi. What is 25 times 4.")
+    assert "Goodbye" not in ctx.voice.said[0]
 
 
 @pytest.mark.parametrize("phrase, title", [
@@ -524,9 +508,10 @@ def test_spoken_general_help_skips_housekeeping():
 def test_help_category(phrase, title):
     ctx = make_ctx()
     assert handle(ctx, phrase) == "help category"
-    reply = ctx.voice.last
+    reply = ctx.voice.said[0]
     assert reply.startswith(f"For {title}, you can say: ")
-    assert 4 <= reply.count(". ") + 1 <= 7
+    assert reply.count(". ") == 2                          # 3 examples...
+    assert ctx.voice.said[1:] == ["Want more?"]           # ...then it asks (FakeVoice answers nothing)
 
 
 def test_help_category_falls_through_to_ai(monkeypatch):

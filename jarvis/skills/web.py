@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from urllib.parse import quote_plus
 
 from jarvis import http
-from jarvis.router import skill
+from jarvis.router import skill, speak_list
 
 log = logging.getLogger(__name__)
 
@@ -91,4 +91,4 @@ def news(ctx, command, match):
     if not titles:
         return f"I couldn't find any news about {topic}." if topic else "I couldn't load the news right now."
     intro = f"Here's the latest on {topic}." if topic else "Here are today's top headlines."
-    return intro + " " + " ".join(f"{i}. {t}." for i, t in enumerate(titles, 1))
+    return speak_list(ctx, intro, [f"{i}. {t}." for i, t in enumerate(titles, 1)], join=" ".join, end="")

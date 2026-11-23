@@ -116,7 +116,7 @@ class Voice:
                 break
             text, done = item
             try:
-                if self._stop_speech.is_set():
+                if self._stop_speech.is_set() or not text:  # "" is wait_idle()'s marker
                     continue
                 if sapi is not None:
                     self._speak_sapi(sapi, text)
@@ -157,6 +157,16 @@ class Voice:
             started = time.perf_counter()
             done.wait(timeout=120)
             timing.add("tts", time.perf_counter() - started)
+
+    def wait_idle(self):
+        """Wait until everything queued with speak(wait=False) has been spoken."""
+        if not self._tts_ok or self._hushed:
+            return
+        done = threading.Event()
+        started = time.perf_counter()
+        self._queue.put(("", done))
+        done.wait(timeout=120)
+        timing.add("tts", time.perf_counter() - started)
 
     def stop_speaking(self):
         """Barge-in: stop talking now and skip whatever else this reply was going to say."""

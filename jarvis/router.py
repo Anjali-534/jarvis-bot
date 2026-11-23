@@ -146,6 +146,37 @@ def _start_one_sec(ctx):
     return timer
 
 
+LIST_CHUNK = 3
+WANT_MORE = "Want more?"
+
+
+def join_and(items):
+    items = list(items)
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def speak_list(ctx, intro, items, join=join_and, end=".", chunk=LIST_CHUNK, print_full=True):
+    """Speak a long list a few items at a time: up to 3, then "Want more?". The full list is printed.
+
+    Returns the last part for the router to speak (or "" if the user didn't want more), so a skill can
+    simply `return speak_list(ctx, "You have 7 events today.", items)`.
+    """
+    items = [str(i) for i in items]
+    if print_full and len(items) > chunk:
+        log.info("\n" + (intro + "\n" if intro else "") + "\n".join(f"  {n}. {item}" for n, item in enumerate(items, 1)))
+    shown, first = 0, True
+    while True:
+        part = items[shown:shown + chunk]
+        shown += len(part)
+        text = " ".join(t for t in ((intro if first else ""), (join(part) + end) if part else "") if t)
+        first = False
+        if shown >= len(items):
+            return text
+        ctx.say(text)
+        if not ctx.confirm(WANT_MORE):
+            return ""
+
+
 def _run(ctx, sk, command, match):
     timer = _start_one_sec(ctx)
     try:

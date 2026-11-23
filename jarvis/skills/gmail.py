@@ -13,7 +13,7 @@ from email.utils import parseaddr, parsedate_to_datetime
 import config
 from jarvis import google_auth
 from jarvis.google_auth import friendly_errors
-from jarvis.router import skill
+from jarvis.router import skill, speak_list
 from jarvis.skills.whatsapp import load_emails, tidy_message
 
 log = logging.getLogger(__name__)
@@ -189,9 +189,7 @@ def check_email(ctx, command, match):
     top = [headers_of(metadata(service, i)) for i in ids[:5]]
     items = [f"from {sender_name(h.get('from'))}: {h.get('subject') or 'no subject'}" for h in top]
     intro = f"You have {count} unread email{plural} in your Primary inbox."
-    if len(ids) > 5:
-        intro += " The latest 5:"
-    return f"{intro} " + "; ".join(items) + "."
+    return speak_list(ctx, intro, items, join="; ".join)
 
 
 @skill("search email",

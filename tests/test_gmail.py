@@ -83,10 +83,11 @@ def test_check_email_counts_and_lists_top_five_without_bodies(monkeypatch):
     fake = use(monkeypatch, FakeGmail(messages, {UNREAD: [m["id"] for m in messages]}))
     ctx = make_ctx()
     assert handle(ctx, "check my email") == "check email"
-    reply = ctx.voice.last
-    assert reply.startswith("You have 7 unread emails in your Primary inbox. The latest 5:")
-    assert "from Person 0: Subject 0" in reply and "Person 4" in reply and "Person 5" not in reply
-    assert "SECRET" not in reply
+    reply = ctx.voice.said[0]
+    assert reply == ("You have 7 unread emails in your Primary inbox. from Person 0: Subject 0; "
+                     "from Person 1: Subject 1; from Person 2: Subject 2.")
+    assert ctx.voice.said[1:] == ["Want more?"]  # declined: Person 3 and 4 are only printed
+    assert not any("SECRET" in s for s in ctx.voice.said)
     assert all(fmt == "metadata" for _, fmt in fake.fetched)  # bodies are never even downloaded
 
 

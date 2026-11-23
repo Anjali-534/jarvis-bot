@@ -31,7 +31,7 @@ def offline(monkeypatch, tmp_path):
     def forbidden(*args, **kwargs):
         raise AssertionError(f"unexpected real side effect: {args[:1]}")
 
-    for name in ("get_json", "get_text", "post_json"):
+    for name in ("get_json", "get_text", "post_json", "post_stream"):
         monkeypatch.setattr(http, name, forbidden)
     for name in ("open_uri", "open_web", "press_enter"):
         monkeypatch.setattr(whatsapp, name, forbidden)

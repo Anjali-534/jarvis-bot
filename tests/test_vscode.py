@@ -150,7 +150,10 @@ def test_run_unknown_falls_through_to_apps(tree, monkeypatch):
 def test_list_projects(tree):
     ctx = make_ctx()
     handle(ctx, "list my projects")
-    assert ctx.voice.last == ("You have 5 projects: bogie admin panel, bogie backend, bogie frontend, go api and jarvis.")
+    ctx = make_ctx(["yes"])
+    handle(ctx, "list my projects")
+    assert ctx.voice.said == ["You have 5 projects: bogie admin panel, bogie backend and bogie frontend.", "Want more?",
+                              "go api and jarvis."]
 
 
 REAL_GIT = vscode.git  # captured at import, before conftest replaces it

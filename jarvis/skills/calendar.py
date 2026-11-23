@@ -12,7 +12,7 @@ from datetime import datetime, time, timedelta, timezone
 import config
 from jarvis import google_auth, notify
 from jarvis.google_auth import friendly_errors
-from jarvis.router import on_startup, skill
+from jarvis.router import on_startup, skill, speak_list
 from jarvis.timeparse import (
     DURATION_RE, MONTHS, clock_parts, find_datetime, find_day, parse_duration, remove_spans, say_clock, say_day,
     say_duration,
@@ -111,10 +111,9 @@ def calendar_today(ctx, command, match):
     events = fetch_events(calendar_api(), start, end)
     if not events:
         return f"Your calendar is clear {phrase}."
-    spoken = [describe(e, current, with_day=phrase == "this week") for e in events[:MAX_SPOKEN]]
+    spoken = [describe(e, current, with_day=phrase == "this week") for e in events]
     count = f"{len(events)} event{'s' if len(events) != 1 else ''}"
-    extra = f" Here are the first {MAX_SPOKEN}." if len(events) > MAX_SPOKEN else ""
-    return f"You have {count} {phrase}.{extra} {_join(spoken)}."
+    return speak_list(ctx, f"You have {count} {phrase}.", spoken)
 
 
 @skill("next meeting", rf"\b(?:my\s+)?next\s+{EVENT}\b", rf"\bwhen is my next\b", rf"\bwhat(?:'s| is) next\b.*{CAL}",

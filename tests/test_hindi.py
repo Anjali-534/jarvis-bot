@@ -3,7 +3,7 @@ import json
 import urllib.parse
 
 import pytest
-from helpers import make_ctx
+from helpers import make_ctx, openai_stream
 
 import config
 from jarvis import http, translit
@@ -100,14 +100,8 @@ def test_hindi_chat_goes_to_ai_with_original_text(monkeypatch, chat):
     monkeypatch.setattr(config, "AI_API_KEY", "test-key")
     sent = []
 
-    class Response:
-        status_code = 200
-
-        @staticmethod
-        def json():
-            return {"choices": [{"message": {"content": "Haan, bilkul!"}}]}
-
-    monkeypatch.setattr(http, "post_json", lambda url, payload, **k: sent.append(payload) or Response())
+    monkeypatch.setattr(http, "post_stream",
+                        lambda url, payload, **k: sent.append(payload) or openai_stream("Haan, bilkul!"))
     ctx = make_ctx()
     assert handle(ctx, chat) == "ai"
     assert sent[0]["messages"][-1]["content"] == chat

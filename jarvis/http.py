@@ -58,6 +58,11 @@ def get_text(url, params=None, timeout=DEFAULT_TIMEOUT, **kwargs):
     return response.text
 
 
+def post_stream(url, payload, headers=None, timeout=DEFAULT_TIMEOUT):
+    """POST JSON and return the response without reading the body (for server-sent-event streams)."""
+    return session().post(url, json=payload, headers=headers or {}, timeout=timeout, stream=True)
+
+
 def post_json(url, payload, headers=None, timeout=DEFAULT_TIMEOUT):
     """POST JSON and return the raw response (callers inspect status codes)."""
     return session().post(url, json=payload, headers=headers or {}, timeout=timeout)

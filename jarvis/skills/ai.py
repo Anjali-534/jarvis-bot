@@ -16,7 +16,8 @@ def system_prompt():
     return (
         f"You are {config.ASSISTANT_NAME}, a friendly voice assistant for {config.USER_NAME}, who lives in India. "
         f"The current date and time is {datetime.now():%A %d %B %Y, %I:%M %p}. "
-        "Your replies are spoken aloud, so answer in 1 to 3 short sentences of plain speech. "
+        "Your replies are spoken aloud, so answer in 1 or 2 short sentences of plain speech, unless the user asks "
+        "you to explain in detail. "
         "Never use markdown, bullet points, code blocks, emojis or URLs. "
         "Language: if the user writes in Hindi or Hinglish (in Devanagari or Roman letters), reply in Hinglish "
         "written ONLY in Roman (English) letters, for example 'Haan bilkul, aap mujhse Hindi mein baat kar sakte hain.' "
@@ -127,16 +128,28 @@ def list_gemini_models():
     return data.get("models", [])
 
 
-def _post_gemini(payload):
-    return http.post_json(f"{GEMINI_BASE}/models/{config.AI_MODEL}:generateContent", payload,
-                          headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
+# ---------------------------------------------------------------- reply length
+SHORT_TOKENS = 150
+DETAIL_TOKENS = 600
+_DETAIL = re.compile(r"\b(?:in detail|in depth|detailed|step by step|explain (?:it )?(?:fully|properly|everything)|"
+                     r"vistaar se|detail mein|detail me)\b")
 
 
-def ask_gemini(system, history, command):
-    """Returns (status, reply_or_error_body)."""
-    payload = gemini_payload(system, history, command)
-    response = _post_gemini(payload)
-    if response.status_code == 404:  # the model was retired: switch to the newest Flash model
+def max_tokens_for(command):
+    return DETAIL_TOKENS if _DETAIL.search(command or "") else SHORT_TOKENS
+
+
+# ---------------------------------------------------------------- Gemini
+def _gemini_url(stream=False):
+    method = "streamGenerateContent?alt=sse" if stream else "generateContent"
+    return f"{GEMINI_BASE}/models/{config.AI_MODEL}:{method}"
+
+
+def _gemini_request(payload, stream=False):
+    """POST to Gemini; on 404 (model retired) switch to the newest Flash model once and retry."""
+    send = http.post_stream if stream else http.post_json
+    response = send(_gemini_url(stream), payload, headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
+    if response.status_code == 404:
         try:
             newest = pick_flash_model(list_gemini_models())
         except Exception as exc:
@@ -146,30 +159,142 @@ def ask_gemini(system, history, command):
             log.warning("[ai] model %s not found, switching to %s (set AI_MODEL=%s in .env)",
                         config.AI_MODEL, newest, newest)
             config.AI_MODEL = newest
-            response = _post_gemini(payload)
+            response = send(_gemini_url(stream), payload, headers=_gemini_headers(), timeout=config.AI_TIMEOUT)
+    return response
+
+
+def _gemini_body(system, history, command, max_tokens):
+    payload = gemini_payload(system, history, command)
+    payload["generationConfig"]["maxOutputTokens"] = max_tokens
+    if "2.5-flash" in config.AI_MODEL:  # don't spend the short token budget on hidden "thinking"
+        payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
+    return payload
+
+
+def ask_gemini(system, history, command, max_tokens=SHORT_TOKENS):
+    """Returns (status, reply_or_error_body)."""
+    response = _gemini_request(_gemini_body(system, history, command, max_tokens))
     if response.status_code >= 400:
         return response.status_code, getattr(response, "text", "") or ""
     return 200, gemini_text(response.json())
 
 
-def ask_openai(system, history, command):
+def _sse_events(response):
+    """Parsed JSON objects from a server-sent-events response ('data: {...}' lines)."""
+    import json
+
+    response.encoding = "utf-8"
+    for line in response.iter_lines(decode_unicode=True):
+        if not line or not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if data == "[DONE]":
+            return
+        try:
+            yield json.loads(data)
+        except ValueError:
+            continue
+
+
+def stream_gemini(system, history, command, max_tokens=SHORT_TOKENS):
+    """Returns (status, text chunks) or (status, error body)."""
+    response = _gemini_request(_gemini_body(system, history, command, max_tokens), stream=True)
+    if response.status_code >= 400:
+        return response.status_code, getattr(response, "text", "") or ""
+
+    def chunks():
+        got_text, finish = False, None
+        for event in _sse_events(response):
+            if (event.get("promptFeedback") or {}).get("blockReason"):
+                raise Blocked(event["promptFeedback"]["blockReason"])
+            for candidate in event.get("candidates") or []:
+                finish = candidate.get("finishReason") or finish
+                for part in (candidate.get("content") or {}).get("parts", []):
+                    if part.get("text"):
+                        got_text = True
+                        yield part["text"]
+        if not got_text:
+            raise Blocked(finish or "no candidates")
+
+    return 200, chunks()
+
+
+# ---------------------------------------------------------------- OpenAI-compatible (Groq, OpenAI...)
+def _openai_body(system, history, command, max_tokens, stream=False):
     messages = [{"role": "system", "content": system}, *history, {"role": "user", "content": command}]
-    response = http.post_json(
-        f"{config.AI_BASE_URL}/chat/completions",
-        {"model": config.AI_MODEL, "messages": messages, "temperature": 0.6, "max_tokens": 300},
-        headers={"Authorization": f"Bearer {config.AI_API_KEY}"}, timeout=config.AI_TIMEOUT,
-    )
+    body = {"model": config.AI_MODEL, "messages": messages, "temperature": 0.6, "max_tokens": max_tokens}
+    if config.AI_REASONING_EFFORT:  # reasoning models (Groq gpt-oss / qwen3): keep thinking short or off
+        body["reasoning_effort"] = config.AI_REASONING_EFFORT
+    if stream:
+        body["stream"] = True
+    return body
+
+
+def _openai_headers():
+    return {"Authorization": f"Bearer {config.AI_API_KEY}"}
+
+
+def ask_openai(system, history, command, max_tokens=SHORT_TOKENS):
+    response = http.post_json(f"{config.AI_BASE_URL}/chat/completions",
+                              _openai_body(system, history, command, max_tokens),
+                              headers=_openai_headers(), timeout=config.AI_TIMEOUT)
     if response.status_code >= 400:
         return response.status_code, getattr(response, "text", "") or ""
     return 200, response.json()["choices"][0]["message"]["content"] or ""
 
 
-def complete(system, history, command):
+def stream_openai(system, history, command, max_tokens=SHORT_TOKENS):
+    response = http.post_stream(f"{config.AI_BASE_URL}/chat/completions",
+                                _openai_body(system, history, command, max_tokens, stream=True),
+                                headers=_openai_headers(), timeout=config.AI_TIMEOUT)
+    if response.status_code >= 400:
+        return response.status_code, getattr(response, "text", "") or ""
+
+    def chunks():
+        for event in _sse_events(response):
+            for choice in event.get("choices") or []:
+                piece = (choice.get("delta") or {}).get("content")
+                if piece:
+                    yield piece
+
+    return 200, chunks()
+
+
+def complete(system, history, command, max_tokens=SHORT_TOKENS):
     """Ask the configured AI. Returns (status, text): text is the reply, or the error body if status >= 400.
 
     Raises Blocked if Gemini refused to answer.
     """
-    return (ask_gemini if provider() == "gemini" else ask_openai)(system, history, command)
+    return (ask_gemini if provider() == "gemini" else ask_openai)(system, history, command, max_tokens)
+
+
+def stream(system, history, command, max_tokens=SHORT_TOKENS):
+    """Like complete(), but the reply comes back as an iterator of text chunks as they're generated."""
+    return (stream_gemini if provider() == "gemini" else stream_openai)(system, history, command, max_tokens)
+
+
+# ---------------------------------------------------------------- speaking as it streams
+_SENTENCE_END = re.compile(r"(?<=[.!?।])[\"')\]]*\s+|\n+")
+MIN_SENTENCE = 12  # don't speak tiny fragments like "Dr." on their own
+
+
+def sentences(chunks, min_length=MIN_SENTENCE):
+    """Group streamed text chunks into sentences (split on . ! ? and new lines) as soon as each one ends."""
+    buffer, search_from = "", 0
+    for piece in chunks:
+        buffer += piece
+        while True:
+            end = _SENTENCE_END.search(buffer, search_from)
+            if not end:
+                break
+            head = buffer[:end.start()].strip()
+            if len(head) < min_length:
+                search_from = end.end()
+                continue
+            yield head
+            buffer, search_from = buffer[end.end():], 0
+    if buffer.strip():
+        yield buffer.strip()
 
 
 @fallback
@@ -178,17 +303,34 @@ def ai(ctx, command, match=None):
         return ("I don't know how to answer that yet. "
                 "To let me answer anything, add an AI_API_KEY to the .env file.")
     history = ctx.state.setdefault("ai_history", [])
+    spoken = []
     try:
-        status, text = complete(system_prompt(), history, command)
+        status, chunks = stream(system_prompt(), history, command, max_tokens_for(command))
+        if status >= 400:
+            log.warning("[ai] HTTP %s: %s", status, chunks[:300])
+            return error_message(status, chunks)
+        for sentence in sentences(chunks):
+            text = strip_markdown(sentence)
+            if not text:
+                continue
+            if getattr(ctx.voice, "_hushed", False):
+                break  # barge-in: stop reading the rest
+            ctx.say(text, wait=False)  # speak this sentence while the next one is still being generated
+            spoken.append(text)
     except Blocked as exc:
         log.info("[ai] response blocked: %s", exc)
-        return BLOCKED
-    if status >= 400:
-        log.warning("[ai] HTTP %s: %s", status, text[:300])
-        return error_message(status, text)
-    reply = strip_markdown(text)
-    if not reply:
+        if not spoken:
+            return BLOCKED
+    except Exception as exc:
+        if not spoken:
+            raise  # nothing said yet: the router turns network errors into a spoken message
+        log.warning("[ai] stream broke off: %s", exc)
+    wait = getattr(ctx.voice, "wait_idle", None)
+    if wait:
+        wait()  # finish speaking before listening again
+    if not spoken:
         return "I'm not sure what to say to that."
+    reply = " ".join(spoken)
     history.extend([{"role": "user", "content": command}, {"role": "assistant", "content": reply}])
     del history[:-MAX_TURNS * 2]
-    return reply
+    return ""

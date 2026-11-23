@@ -34,9 +34,13 @@ Free AI keys:
 | Provider | Get a key | `AI_PROVIDER` | `AI_BASE_URL` | `AI_MODEL` |
 |---|---|---|---|---|
 | Gemini (Google AI Studio) | <https://aistudio.google.com/apikey> | `gemini` | `https://generativelanguage.googleapis.com/v1beta` | `gemini-2.5-flash` |
-| Groq | <https://console.groq.com/keys> | `openai` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| Groq (fastest) | <https://console.groq.com/keys> | `openai` | `https://api.groq.com/openai/v1` | `qwen/qwen3.8-27b` with `AI_REASONING_EFFORT=none` |
 
 **Gemini** uses the native `generateContent` API with the key in the `x-goog-api-key` header. Google issues keys in two formats, the newer `AQ.…` auth keys and the older `AIza…` keys, and Jarvis sends both the same way. (`AQ.` keys don't work on Google's OpenAI-compatible `/v1beta/openai` endpoint, which is why Jarvis doesn't use it.) If the model has been retired, Jarvis switches to the newest Flash model for the session and logs the name to put in `AI_MODEL`.
+
+**Groq** models change often: if Jarvis says the model wasn't found, check the current list at <https://console.groq.com/docs/models>. Reasoning models (`qwen/...`, `openai/gpt-oss-...`) answer faster with `AI_REASONING_EFFORT=none` (Qwen) or `low` (gpt-oss).
+
+**Short, streamed answers.** The AI is asked for 1 or 2 short sentences (150 tokens) unless you say "explain in detail" (600 tokens). Replies are streamed: Jarvis starts speaking the first sentence while the rest is still being written. On this laptop, speaking is the slowest step, so long skill replies (help, news, calendar, email, notes, reminders, projects) speak 3 items and then ask "Want more?". Say yes to hear the next 3. The full list is always printed in the terminal.
 
 If the key is rejected, the model name is wrong, or the free quota runs out, Jarvis says so instead of failing silently. If Google rejects a key with `ACCESS_TOKEN_TYPE_UNSUPPORTED` or `API_KEY_SERVICE_BLOCKED`, the key isn't allowed to use the Gemini API: create one in AI Studio, or in Cloud Console allow the **Generative Language API** under the key's API restrictions.
 
@@ -263,6 +267,16 @@ How a command is handled:
 3. When one matches, the handler runs. Returning a string speaks it; returning `""` or `True` means "handled"; returning `None` means "not mine", and the router moves on to the next skill. For example, the calculator returns `None` for "what is python", so Wikipedia answers instead.
 4. If nothing handles it, the AI fallback does.
 5. Network errors and crashes inside a skill are caught and turned into a short spoken apology. Jarvis never crashes.
+
+## Keeping secrets out of git
+
+API keys live only in `.env`, which is git-ignored. As a safety net, install the pre-commit hook once:
+
+```powershell
+python scripts/install_hooks.py
+```
+
+Every `git commit` then runs `scripts/check_secrets.py` on the staged files. It blocks the commit if it finds something that looks like an API key: Google `AIza…` and `AQ.…` keys, Groq `gsk_…`, `sk-…` keys, GitHub tokens, private keys, or long random tokens. It shows only the first few characters of anything it finds. Run `python scripts/check_secrets.py --all` to check every tracked file. For a false alarm, add the comment `secret-check: ignore` at the end of that line.
 
 ## Adding a skill
 

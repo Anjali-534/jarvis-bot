@@ -38,6 +38,8 @@ Starting Jarvis a second time doesn't open a second copy; it wakes the one alrea
 
 ---
 
+**Long answers:** lists (help, news, calendar, email, notes, reminders, projects) are spoken 3 at a time. Say "yes" to "Want more?" to hear the rest. The full list is printed in the terminal. The AI answers in 1 or 2 sentences unless you say "explain in detail".
+
 ## Air quality
 Live Indian CPCB AQI for any area or pincode. Jarvis remembers your area for the session.
 
