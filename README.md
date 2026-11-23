@@ -18,7 +18,8 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 
 | Setting | What it does |
 |---|---|
-| `AI_API_KEY` | Lets Jarvis answer any question. Works with any OpenAI-compatible API; set `AI_BASE_URL` and `AI_MODEL` to match (free options below). |
+| `AI_API_KEY` | Lets Jarvis answer any question, using Gemini's native API or any OpenAI-compatible API (free options below). |
+| `AI_PROVIDER` | `gemini` or `openai`. If empty, it's `gemini` when `AI_BASE_URL` is a `generativelanguage.googleapis.com` URL, otherwise `openai`. |
 | `WAQI_TOKEN` | A free token from <https://aqicn.org/data-platform/token/>. Red zones then come from real CPCB monitoring stations. |
 | `DEFAULT_LOCATION` | Used until you tell Jarvis your area. Defaults to New Delhi. |
 | `VOICE_NAME`, `VOICE_RATE` | Part of a Windows voice name (`zira`, `david`, `heera`...) and the speaking speed. |
@@ -30,12 +31,14 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 
 Free AI keys:
 
-| Provider | Get a key | `AI_BASE_URL` | `AI_MODEL` |
-|---|---|---|---|
-| Gemini (Google AI Studio) | <https://aistudio.google.com/apikey> | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` |
-| Groq | <https://console.groq.com/keys> | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| Provider | Get a key | `AI_PROVIDER` | `AI_BASE_URL` | `AI_MODEL` |
+|---|---|---|---|---|
+| Gemini (Google AI Studio) | <https://aistudio.google.com/apikey> | `gemini` | `https://generativelanguage.googleapis.com/v1beta` | `gemini-2.5-flash` |
+| Groq | <https://console.groq.com/keys> | `openai` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
 
-If the key is wrong, the model name is wrong, or the free quota runs out, Jarvis says so instead of failing silently.
+**Gemini** uses the native `generateContent` API with the key in the `x-goog-api-key` header. Google issues keys in two formats, the newer `AQ.…` auth keys and the older `AIza…` keys, and Jarvis sends both the same way. (`AQ.` keys don't work on Google's OpenAI-compatible `/v1beta/openai` endpoint, which is why Jarvis doesn't use it.) If the model has been retired, Jarvis switches to the newest Flash model for the session and logs the name to put in `AI_MODEL`.
+
+If the key is rejected, the model name is wrong, or the free quota runs out, Jarvis says so instead of failing silently. If Google rejects a key with `ACCESS_TOKEN_TYPE_UNSUPPORTED` or `API_KEY_SERVICE_BLOCKED`, the key isn't allowed to use the Gemini API: create one in AI Studio, or in Cloud Console allow the **Generative Language API** under the key's API restrictions.
 
 For WhatsApp, copy `contacts.example.json` to `data\contacts.json` and add your contacts (country code plus number, digits only), or add them by voice. For extra project names, copy `projects.example.json` to `data\projects.json`. Everything in `data\` is git-ignored.
 

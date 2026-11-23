@@ -49,6 +49,9 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "USER_NAME", "Anjali")
     monkeypatch.setattr(config, "WAQI_TOKEN", "")
     monkeypatch.setattr(config, "AI_API_KEY", "")
+    monkeypatch.setattr(config, "AI_PROVIDER", "openai")  # tests that need Gemini switch it on
+    monkeypatch.setattr(config, "AI_BASE_URL", "https://api.openai.com/v1")
+    monkeypatch.setattr(config, "AI_MODEL", "gpt-4o-mini")
     monkeypatch.setattr(config, "WHATSAPP_SEND_DELAY", 3.0)
     monkeypatch.setattr(config, "NOTIFY", False)          # no real toasts popping up during tests
     monkeypatch.setattr(config, "LOG_DIR", tmp_path / "data" / "logs")

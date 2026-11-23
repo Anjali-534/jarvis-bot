@@ -12,7 +12,7 @@ from email.mime.text import MIMEText
 from email.utils import parseaddr, parsedate_to_datetime
 
 import config
-from jarvis import google_auth, http
+from jarvis import google_auth
 from jarvis.google_auth import friendly_errors
 from jarvis.router import skill
 from jarvis.skills.whatsapp import load_emails, tidy_message
@@ -113,23 +113,14 @@ def summarize(text):
     if not text:
         return ""
     if config.AI_API_KEY:
-        try:
-            response = http.post_json(
-                f"{config.AI_BASE_URL}/chat/completions",
-                {"model": config.AI_MODEL, "temperature": 0.2, "max_tokens": 120, "messages": [
-                    {"role": "system", "content": "Summarise this email in at most two short sentences of plain "
-                                                  "spoken English. No markdown, no URLs."},
-                    {"role": "user", "content": text[:4000]},
-                ]},
-                headers={"Authorization": f"Bearer {config.AI_API_KEY}"},
-            )
-            if response.status_code < 400:
-                from jarvis.skills.ai import strip_markdown
+        from jarvis.skills.ai import complete, strip_markdown
 
-                reply = strip_markdown(response.json()["choices"][0]["message"]["content"] or "")
-                if reply:
-                    return reply
-            log.warning("[gmail] AI summary failed with HTTP %s", response.status_code)
+        try:
+            status, reply = complete("Summarise this email in at most two short sentences of plain spoken English. "
+                                     "No markdown, no URLs.", [], text[:4000])
+            if status < 400 and strip_markdown(reply):
+                return strip_markdown(reply)
+            log.warning("[gmail] AI summary failed with HTTP %s", status)
         except Exception as exc:
             log.warning("[gmail] AI summary failed: %s", exc)
     return first_sentences(text)

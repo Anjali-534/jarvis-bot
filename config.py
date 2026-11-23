@@ -55,6 +55,10 @@ RED_ZONE_THRESHOLD = _int("RED_ZONE_THRESHOLD", 200)
 AI_API_KEY = _str("AI_API_KEY") or _str("OPENAI_API_KEY")
 AI_BASE_URL = _str("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 AI_MODEL = _str("AI_MODEL", "gpt-4o-mini")
+# gemini = Google's native Gemini API (works with both AQ. and AIza keys); openai = any OpenAI-compatible API.
+# Empty: gemini if AI_BASE_URL is a generativelanguage.googleapis.com URL, otherwise openai.
+AI_PROVIDER = _str("AI_PROVIDER").lower()
+AI_TIMEOUT = _int("AI_TIMEOUT", 15)
 
 def _float(name, default):
     try:
