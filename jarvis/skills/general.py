@@ -57,6 +57,10 @@ CATEGORIES = {
     "notes": ("notes and reminders", {"notes and reminders", "notes", "note", "reminders", "reminder", "timers",
                                       "timer", "alarms"}),
     "whatsapp": ("WhatsApp", {"whatsapp", "whats app", "contacts", "messaging"}),
+    "email": ("email", {"email", "emails", "e-mail", "e mail", "mail", "gmail", "inbox", "google", "drafts"}),
+    "calendar": ("calendar", {"calendar", "google calendar", "meetings", "meeting", "events", "event", "schedule",
+                              "agenda"}),
+    "spotify": ("Spotify", {"spotify", "playlist", "playlists", "liked songs", "songs"}),
     "vs code": ("VS Code", {"vs code", "vscode", "visual studio code", "code", "coding", "projects", "project", "git",
                             "github"}),
     "general": ("general questions", {"general questions", "general", "questions", "maths", "math", "calculator",
@@ -65,13 +69,13 @@ CATEGORIES = {
 
 SHORT_HELP = (
     "I can help with air quality, time and weather, apps, laptop controls, web, notes and reminders, "
-    "WhatsApp, VS Code, and general questions. Say 'help with' and a category to hear its commands."
+    "WhatsApp, email, calendar, Spotify, VS Code, and general questions. Say 'help with' and a category to hear its commands."
 )
 
 
 # Housekeeping skills: listed in the printed help, but not worth speaking as examples.
 NOT_SPOKEN = {"exit", "sleep", "help", "help category", "greet", "who are you", "how are you", "thanks",
-              "forget conversation"}
+              "forget conversation", "connect google", "disconnect google", "connect spotify"}
 
 
 def examples_for(category, limit=None, spoken=False):
@@ -116,6 +120,8 @@ def find_category(text):
        r"\bhow (?:do|can) i use\s+(.+?)$", r"\bwhat (?:are the )?commands (?:for|of)\s+(.+)$",
        category="general", help=["help with laptop", "what can you do with VS Code"])
 def help_category(ctx, command, match):
+    if re.search(r"\b(?:write|draft|compose|send|make|create|plan|fix|solve|choose|pick|find)\b", match.group(1)):
+        return None  # "help me write an email to my teacher" is a task for the AI, not the email commands
     key = find_category(match.group(1))
     if key is None:
         return None  # "help me write an email" goes to the AI

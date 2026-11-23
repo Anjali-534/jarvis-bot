@@ -28,7 +28,7 @@ def system_prompt():
 def error_message(status, body=""):
     """A clear spoken message for an HTTP error from the AI service."""
     body = (body or "").lower()
-    if status == 401 or status == 403 or (status == 400 and "api key" in body):
+    if status == 401 or status == 403 or (status == 400 and ("api key" in body or "auth key" in body)):
         return "My AI key was rejected. Please check AI_API_KEY in your .env file."
     if status == 404:
         return (f"The AI model {config.AI_MODEL} wasn't found. "

@@ -10,7 +10,7 @@ import threading
 import time
 
 import config
-from jarvis.router import Context, handle
+from jarvis.router import Context, handle, run_startup
 
 log = logging.getLogger(__name__)
 
@@ -184,6 +184,7 @@ class Assistant:
     def run(self):
         """The loop. Returns when someone says goodbye, stop() is called, or Ctrl+C."""
         self.greet()
+        run_startup(self.ctx)  # e.g. calendar reminders, if Google is connected
         try:
             while self.ctx.running:
                 if self.mic_muted:

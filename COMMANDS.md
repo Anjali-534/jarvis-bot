@@ -92,6 +92,35 @@ Reminders only work while Jarvis is running.
 
 Jarvis always reads the message back and asks before sending.
 
+## Email (Gmail)
+Say "connect google" once first (setup steps are in the README).
+- "Check my email" / "any new emails": the unread count in your Primary inbox, plus the sender and subject of the latest 5. Bodies are never read out.
+- "Read the email from Dhruv": a short summary (an AI summary if `AI_API_KEY` is set, otherwise the first two sentences)
+- "Search email for invoice": the top 3 matches
+- "Email Dhruv saying the demo is at 5" / "write an email to Riya about the trip": reads the draft back, asks first, then saves a **draft** in Gmail. Jarvis never sends email.
+- "Connect google" / "disconnect google" (asks first)
+
+Email addresses come from `data/contacts.json` (`"dhruv": {"phone": "...", "email": "dhruv@example.com"}`) or from people in your recent mail.
+
+## Calendar (Google Calendar)
+Times are in IST. Uses the same "connect google".
+- "What's on my calendar today" / "tomorrow" / "on Friday" / "my meetings this week"
+- "My next meeting" / "when is my next meeting"
+- "Add meeting with Dhruv tomorrow at 5 pm for 30 minutes" / "schedule dentist on Monday at 11" (reads it back and asks first; 30 minutes if you don't say how long)
+- "Cancel my 5 pm meeting" / "cancel the meeting with Dhruv" (asks first)
+- While Google is connected, Jarvis says a reminder and shows a toast 10 minutes before each event.
+
+"At 11" on another day means a working hour: 1 to 7 is PM, 8 to 11 is AM.
+
+## Spotify
+Say "connect spotify" once first (setup steps are in the README). Playback control needs Spotify Premium.
+- "Play Believer on Spotify" / "play my liked songs" / "play playlist workout" / "play my chill playlist on Spotify"
+- "Pause Spotify" / "resume Spotify" / "next song on Spotify" / "previous song on Spotify"
+- "What's playing" / "Spotify volume 50"
+- If Spotify isn't open, Jarvis opens the app and tries again.
+- If Spotify isn't connected, "play X on Spotify" opens a Spotify search, and pause and next use the media keys.
+- Plain "next song" and "pause the music" always use the media keys, which work with Spotify too.
+
 ## VS Code
 - "Open jarvis in VS Code" / "open bogie admin project" / "work on bogie backend"
 - "New VS Code window" / "open VS Code here"

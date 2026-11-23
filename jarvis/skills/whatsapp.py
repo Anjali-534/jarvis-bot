@@ -55,7 +55,8 @@ def whatsapp_installed():
 
 
 # ---------------------------------------------------------------- contacts
-def load_contacts():
+def raw_contacts():
+    """data/contacts.json as written: {"mom": "9198...", "dhruv": {"phone": "9198...", "email": "d@x.com"}}."""
     path = config.CONTACTS_FILE
     if not path.exists():
         return {}
@@ -64,15 +65,45 @@ def load_contacts():
     except json.JSONDecodeError:
         log.warning(f"[whatsapp] {path} is not valid JSON")
         return {}
-    return {str(k).strip().lower(): str(v) for k, v in data.items() if str(k).strip()}
+    return data if isinstance(data, dict) else {}
+
+
+def _field(value, *keys):
+    if isinstance(value, dict):
+        return next((str(value[k]).strip() for k in keys if value.get(k)), "")
+    return str(value).strip()
+
+
+def load_contacts():
+    """name -> phone number (entries with only an email are skipped)."""
+    contacts = {}
+    for name, value in raw_contacts().items():
+        number = _field(value, "phone", "number", "whatsapp")
+        if str(name).strip() and number and "@" not in number:
+            contacts[str(name).strip().lower()] = number
+    return contacts
+
+
+def load_emails():
+    """name -> email address, from {"email": ...} entries or plain values that are addresses."""
+    emails = {}
+    for name, value in raw_contacts().items():
+        address = _field(value, "email", "mail")
+        if str(name).strip() and "@" in address:
+            emails[str(name).strip().lower()] = address
+    return emails
 
 
 def save_contact(name, number):
-    contacts = load_contacts()
-    contacts[name.strip().lower()] = number
+    data = raw_contacts()
+    key = next((k for k in data if str(k).strip().lower() == name.strip().lower()), name.strip().lower())
+    if isinstance(data.get(key), dict):
+        data[key]["phone"] = number  # keep their email
+    else:
+        data[key] = number
     path = config.CONTACTS_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(contacts, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def normalize_number(raw):

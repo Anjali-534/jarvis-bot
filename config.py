@@ -82,3 +82,15 @@ PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")
 HOTKEY = _str("HOTKEY", "ctrl+alt+j")          # wakes Jarvis instantly; empty to disable
 NOTIFY = _bool("NOTIFY", True)                  # Windows toasts for reminders and timers
 LOG_DIR = _path("LOG_DIR", "data/logs")
+
+# Google (Gmail + Calendar): OAuth client from Google Cloud Console, and where the sign-in token is saved
+GOOGLE_CREDENTIALS_FILE = _path("GOOGLE_CREDENTIALS_FILE", "data/google_credentials.json")
+GOOGLE_TOKEN_FILE = _path("GOOGLE_TOKEN_FILE", "data/google_token.json")
+TIMEZONE = "Asia/Kolkata"                       # calendar times are spoken in IST
+CALENDAR_REMINDERS = _bool("CALENDAR_REMINDERS", True)  # spoken + toast reminder before each event
+CALENDAR_REMINDER_MINUTES = _int("CALENDAR_REMINDER_MINUTES", 10)
+
+# Spotify: client ID of your app at developer.spotify.com (PKCE flow, no client secret needed)
+SPOTIFY_CLIENT_ID = _str("SPOTIFY_CLIENT_ID")
+SPOTIFY_REDIRECT_URI = _str("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback")
+SPOTIFY_TOKEN_FILE = _path("SPOTIFY_TOKEN_FILE", "data/spotify_token.json")

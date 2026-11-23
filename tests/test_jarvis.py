@@ -66,6 +66,34 @@ ROUTES = [
     ("list my projects", "vscode list projects"), ("rescan projects", "vscode rescan"),
     ("git status of jarvis", "git status"), ("pull jarvis", "git pull"), ("run bogie backend", "run project"),
     ("open vs code", "open"),
+    # gmail
+    ("connect google", "connect google"), ("disconnect google", "disconnect google"),
+    ("check my email", "check email"), ("any new emails", "check email"), ("do i have any unread emails", "check email"),
+    ("email", "check email"), ("check my inbox", "check email"),
+    ("read the email from dhruv", "read email"), ("what did dhruv email me", "read email"),
+    ("search email for invoice", "search email"), ("search my gmail for flight tickets", "search email"),
+    ("email dhruv saying the demo is at 5", "email draft"), ("write an email to riya about the trip", "email draft"),
+    ("send an email to mom", "email draft"), ("open gmail", "open"), ("search invoice", "google"),
+    # calendar
+    ("what's on my calendar today", "calendar today"), ("what's on my calendar tomorrow", "calendar today"),
+    ("what do i have on friday", "calendar today"), ("my meetings this week", "calendar today"),
+    ("am i free tomorrow", "calendar today"), ("my next meeting", "next meeting"),
+    ("when is my next meeting", "next meeting"),
+    ("add meeting with dhruv tomorrow at 5 pm for 30 minutes", "add event"),
+    ("schedule dentist on monday at 11", "add event"), ("add lunch with mom tomorrow at 1 to my calendar", "add event"),
+    ("cancel my 5 pm meeting", "cancel event"), ("delete the standup from my calendar", "cancel event"),
+    ("schedule a shutdown in 10 minutes", "ai"), ("remind me tomorrow at 5 pm to call dhruv", "reminder"),
+    ("cancel my reminders", "cancel reminders"),
+    # spotify
+    ("connect spotify", "connect spotify"), ("play believer on spotify", "spotify play"),
+    ("spotify play kesariya", "spotify play"), ("play my liked songs", "spotify liked songs"),
+    ("play playlist workout", "spotify playlist"), ("play my chill playlist on spotify", "spotify playlist"),
+    ("pause spotify", "spotify pause"), ("resume spotify", "spotify resume"),
+    ("next song on spotify", "spotify next"), ("skip song on spotify", "spotify next"),
+    ("previous song on spotify", "spotify previous"), ("what's playing", "spotify now playing"),
+    ("what song is this", "spotify now playing"), ("spotify volume 50", "spotify volume"),
+    ("next song", "next track"), ("pause the music", "play pause"), ("play believer", "play youtube"),
+    ("quit spotify", "close"), ("open spotify", "open"), ("volume up", "volume up"),
 ]
 
 @pytest.mark.parametrize("phrase, expected", ROUTES)
@@ -490,6 +518,8 @@ def test_spoken_general_help_skips_housekeeping():
     ("what can you do with vs code", "VS Code"), ("help me with my notes", "notes and reminders"),
     ("help with the air quality", "air quality"), ("help with whats app", "WhatsApp"),
     ("help with vs cod", "VS Code"), ("commands for weather", "time and weather"), ("help with youtube", "web"),
+    ("help with email", "email"), ("help with gmail", "email"), ("help with calendar", "calendar"),
+    ("help with my meetings", "calendar"), ("help with spotify", "Spotify"), ("help with playlists", "Spotify"),
 ])
 def test_help_category(phrase, title):
     ctx = make_ctx()
@@ -551,3 +581,9 @@ def test_main_loop_no_wake_misses():
     voice = FakeVoice(["", "", "exit"], stop_when_empty=True)
     run(wake_enabled=False, voice=voice)
     assert "Sorry, I didn't catch that." in voice.said
+
+
+def test_ai_rejected_key_message_for_gemini():
+    from jarvis.skills.ai import error_message
+
+    assert error_message(400, '{"error": {"message": "Invalid Auth key."}}').startswith("My AI key was rejected.")

@@ -59,6 +59,23 @@ def fallback(fn):
     return fn
 
 
+STARTUP: list[Callable] = []
+
+
+def on_startup(fn):
+    """Register fn(ctx) to run once when the listening loop starts (e.g. background pollers)."""
+    STARTUP.append(fn)
+    return fn
+
+
+def run_startup(ctx):
+    for fn in STARTUP:
+        try:
+            fn(ctx)
+        except Exception:  # a broken integration must never stop Jarvis from starting
+            log.exception("Startup hook %s failed", getattr(fn, "__name__", fn))
+
+
 YES_WORDS = {
     "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "haan", "han", "ha", "haa", "ji", "haan ji",
     "of course", "do it", "go ahead", "confirm", "confirmed", "please", "absolutely", "correct", "right",

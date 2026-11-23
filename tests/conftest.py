@@ -10,8 +10,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import config  # noqa: E402
 import jarvis.skills  # noqa: E402,F401
-from jarvis import geo, http, router  # noqa: E402
-from jarvis.skills import vscode, whatsapp  # noqa: E402
+from jarvis import geo, google_auth, http, router  # noqa: E402
+from jarvis.skills import calendar, spotify, vscode, whatsapp  # noqa: E402
 
 PURE_SKILLS = {"calculator"}  # real handlers that may return None to fall through
 
@@ -38,6 +38,13 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(whatsapp, "sleep", lambda seconds: None)
     monkeypatch.setattr(vscode, "shell", forbidden)
     monkeypatch.setattr(vscode, "git", forbidden)
+    # Google and Spotify: no real sign-in, API call, app launch or media key
+    monkeypatch.setattr(google_auth, "service", forbidden)
+    monkeypatch.setattr(google_auth, "run_flow", forbidden)
+    for name in ("open_uri", "media_key", "run_flow"):
+        monkeypatch.setattr(spotify, name, forbidden)
+    monkeypatch.setattr(spotify, "sleep", lambda seconds: None)
+    monkeypatch.setattr(calendar, "schedule_alert", forbidden)
 
     monkeypatch.setattr(config, "USER_NAME", "Anjali")
     monkeypatch.setattr(config, "WAQI_TOKEN", "")
@@ -49,9 +56,16 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CONTACTS_FILE", tmp_path / "data" / "contacts.json")
     monkeypatch.setattr(config, "PROJECTS_FILE", tmp_path / "data" / "projects.json")
     monkeypatch.setattr(config, "PROJECT_ROOTS", [])
+    monkeypatch.setattr(config, "GOOGLE_CREDENTIALS_FILE", tmp_path / "data" / "google_credentials.json")
+    monkeypatch.setattr(config, "GOOGLE_TOKEN_FILE", tmp_path / "data" / "google_token.json")
+    monkeypatch.setattr(config, "SPOTIFY_TOKEN_FILE", tmp_path / "data" / "spotify_token.json")
+    monkeypatch.setattr(config, "SPOTIFY_CLIENT_ID", "")
+    monkeypatch.setattr(config, "CALENDAR_REMINDERS", True)
+    monkeypatch.setattr(config, "CALENDAR_REMINDER_MINUTES", 10)
     monkeypatch.setattr(vscode, "_cache", None)
     geo._CACHE.clear()
     yield
     from jarvis.skills import notes
 
     notes.cancel_all_timers()  # a reminder must not fire into a later test (or pop a real toast)
+    calendar.stop_reminders()

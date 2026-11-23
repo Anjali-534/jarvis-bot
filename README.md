@@ -1,6 +1,6 @@
 # Jarvis: personal voice assistant
 
-Jarvis is a voice assistant for a Windows laptop, written in Python 3.13. It started as an AQI bot and still focuses on air quality. It gives live CPCB AQI, PM2.5, PM10, NO2 and red zones for any area or pincode in India. It also handles weather, apps, websites, YouTube, news, notes, reminders, laptop controls, maths and general questions.
+Jarvis is a voice assistant for a Windows laptop, written in Python 3.13. It started as an AQI bot and still focuses on air quality. It gives live CPCB AQI, PM2.5, PM10, NO2 and red zones for any area or pincode in India. It also handles weather, apps, websites, YouTube, news, notes, reminders, laptop controls, Gmail, Google Calendar, Spotify, maths and general questions.
 
 Each feature lives in its own **skill file**, so new integrations (WhatsApp, VS Code and so on) can be added without touching the rest.
 
@@ -24,6 +24,8 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 | `VOICE_NAME`, `VOICE_RATE` | Part of a Windows voice name (`zira`, `david`, `heera`...) and the speaking speed. |
 | `WAKE_WORDS`, `FOLLOW_UP_SECONDS` | The wake phrases, and how long you can keep talking without one after a reply. |
 | `WHATSAPP_SEND_DELAY` | Seconds to wait for WhatsApp to open a chat before pressing Enter (default 3). |
+| `SPOTIFY_CLIENT_ID` | Lets Jarvis control Spotify (see [Connecting Google and Spotify](#connecting-google-and-spotify)). |
+| `CALENDAR_REMINDERS`, `CALENDAR_REMINDER_MINUTES` | Spoken reminder and toast before each calendar event (on by default, 10 minutes before). |
 | `PROJECT_ROOTS` | Folders to scan for code projects, separated by `;`. Defaults to `C:\Users\ADMIN\OneDrive\Desktop\ANJALI`. |
 
 Free AI keys:
@@ -65,6 +67,31 @@ python uninstall_startup.py   # undo that
 - **Notifications:** reminders and timers also show a Windows toast (`NOTIFY=true`), so you see them while you're muted or in a meeting.
 - **One copy only:** a named mutex stops a second Jarvis from starting. Launching it again, from the tray launcher or from `main.py`, wakes the one already running instead.
 - **Logs:** everything is written to `data\logs\jarvis.log`, rotating at 1 MB and keeping 5 old files. `main.py` also prints to the console; the tray app has no console, so check the log (tray menu > Open logs) if something seems wrong.
+
+## Connecting Google and Spotify
+
+Everything is stored in `data\` (git-ignored). Jarvis never sends email. It only saves drafts, and it asks before creating or deleting anything.
+
+### Google (Gmail + Calendar)
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a **new project** (for example "Jarvis").
+2. **APIs & Services > Library:** enable the **Gmail API** and the **Google Calendar API**.
+3. **APIs & Services > OAuth consent screen:** choose **External**, name it Jarvis, and use your own email for the contact fields. Under **Test users**, **add your own Gmail address**.
+4. **APIs & Services > Credentials > Create credentials > OAuth client ID**, with application type **Desktop app**.
+5. Download the JSON and save it as `data\google_credentials.json`.
+6. Say **"connect google"**. A browser opens: pick your account, click *Continue* on the "Google hasn't verified this app" screen (it's your own app), and allow access. The token is saved to `data\google_token.json`.
+
+The permissions are `gmail.readonly`, `gmail.compose` (drafts) and `calendar.events`. If you say "connect google" before the JSON is in place, Jarvis prints these steps in the terminal (and in the log).
+
+### Spotify
+
+1. Open the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and click **Create app**.
+2. Set the redirect URI to exactly `http://127.0.0.1:8888/callback`, tick **Web API** and save.
+3. Copy the app's **Client ID**. Jarvis uses the PKCE flow, so you don't need the client secret.
+4. Put it in `.env` as `SPOTIFY_CLIENT_ID=...` and restart Jarvis.
+5. Say **"connect spotify"** and log in. The token is cached in `data\spotify_token.json`.
+
+Spotify only allows apps to control playback on **Premium** accounts. Without a connection, "play X on Spotify" opens a search in the Spotify app instead.
 
 ## What you can say
 
@@ -112,6 +139,22 @@ python uninstall_startup.py   # undo that
 - "Git status of jarvis": branch, ahead/behind, and how many files changed (file names are never read out)
 - "Pull jarvis": asks first, then runs `git pull --ff-only`. Jarvis never pushes, commits or resets by voice.
 - "Run bogie backend" / "start the go api server": asks first, then opens a new terminal running `npm run dev`, `npm start`, `go run .` or `python main.py`
+
+**Email** (after "connect google")
+- "Check my email", "any new emails": unread count in the Primary inbox, plus the senders and subjects of the latest 5
+- "Read the email from Dhruv": a short summary (bodies are only read when you ask)
+- "Search email for invoice": the top 3 matches
+- "Email Dhruv saying the demo is at 5": reads it back, asks, and saves a **draft** (never sends)
+
+**Calendar** (after "connect google", times in IST)
+- "What's on my calendar today / tomorrow / this week", "my next meeting"
+- "Add meeting with Dhruv tomorrow at 5 pm for 30 minutes", "schedule dentist on Monday at 11" (asks first)
+- "Cancel my 5 pm meeting" (asks first)
+- A spoken reminder and a toast 10 minutes before each event
+
+**Spotify** (after "connect spotify")
+- "Play Believer on Spotify", "play my liked songs", "play playlist workout"
+- "Pause Spotify", "next song on Spotify", "what's playing", "Spotify volume 50"
 
 **Web**
 - "Play Arijit Singh songs", "play lofi beats on YouTube"
@@ -168,10 +211,13 @@ jarvis/http.py          shared requests.Session with timeouts: get_json / get_te
 jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_from_command()
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")
 jarvis/skills/
-    __init__.py         imports skills IN ORDER: general, notes, system, web, whatsapp, vscode,
-                        apps, weather, aqi, knowledge, ai
+    __init__.py         imports skills IN ORDER: general, notes, gmail, calendar, spotify, system,
+                        web, whatsapp, vscode, apps, weather, aqi, knowledge, ai
     general.py          exit, sleep, help, greetings, time, date, calculator, jokes
     notes.py            notes file, reminders, timers
+    gmail.py            unread count, read/search email, drafts only; "connect google"
+    calendar.py         today/week/next meeting, add/cancel events, reminders before events
+    spotify.py          play songs/liked songs/playlists, pause/skip, now playing, volume
     system.py           volume, media, brightness, screenshot, battery, status, lock, power
     web.py              YouTube, Google, Google News
     whatsapp.py         WhatsApp messages, calls, contacts (data/contacts.json)
@@ -181,8 +227,9 @@ jarvis/skills/
     aqi.py              CPCB AQI, pollutants, safety advice, red zones
     knowledge.py        Wikipedia summaries
     ai.py               OpenAI-compatible fallback with short conversation memory
-tests/                  offline tests: conftest.py blocks network and real apps;
-                        test_jarvis.py, test_whatsapp.py, test_vscode.py
+tests/                  offline tests: conftest.py blocks network, real apps, Google and Spotify;
+                        test_jarvis.py, test_whatsapp.py, test_vscode.py, test_gmail.py,
+                        test_calendar.py, test_spotify.py (fakes.py holds the fake APIs)
 ```
 
 How a command is handled:
@@ -195,21 +242,20 @@ How a command is handled:
 
 ## Adding a skill
 
-`whatsapp.py` and `vscode.py` are complete examples. A minimal skill, `jarvis/skills/spotify.py`:
+`whatsapp.py`, `gmail.py` and `spotify.py` are complete examples. A minimal skill, `jarvis/skills/coin.py`:
 
 ```python
+import random
+
 from jarvis.router import skill
-from jarvis.skills.apps import launch
 
 
-@skill("spotify playlist", r"\bplay (?:my )?(.+?) playlist on spotify$", help="play my workout playlist on spotify")
-def spotify_playlist(ctx, command, match):
-    name = match.group(1)
-    launch(f"spotify:search:{name}")
-    return f"Searching Spotify for your {name} playlist."
+@skill("coin flip", r"\b(?:flip|toss) a coin\b", category="general", help="flip a coin")
+def coin_flip(ctx, command, match):
+    return f"It's {random.choice(['heads', 'tails'])}."
 ```
 
-Then add `spotify` to the import list in `jarvis/skills/__init__.py`. Order matters, because the first matching skill wins: put it **before** `web` here, or "play X on spotify" goes to YouTube. Integrations normally go before `apps`, and always before `knowledge` and `ai`. Add its phrases to the `ROUTES` table in `tests/test_jarvis.py`, and replace side effects (launching, keypresses, subprocess calls) with small module functions that `tests/conftest.py` can stub out.
+Then add `coin` to the import list in `jarvis/skills/__init__.py`. Order matters, because the first matching skill wins: a skill whose phrases start with "play" must come **before** `web`, or YouTube takes them (that's why `spotify` does). Integrations normally go before `apps`, and always before `knowledge` and `ai`. Add its phrases to the `ROUTES` table in `tests/test_jarvis.py`, and replace side effects (launching, keypresses, subprocess calls) with small module functions that `tests/conftest.py` can stub out.
 
 Some guidelines:
 - Use `ctx.say`, `ctx.ask` and `ctx.confirm` for conversation, and `ctx.state` for memory within a session.
@@ -229,8 +275,8 @@ Some guidelines:
 
 - **WhatsApp:** read unread chats, send to groups
 - **VS Code:** recent projects, run tests by voice
-- **Spotify:** play playlists and liked songs through the Spotify API
-- **Calendar and email:** today's meetings, read and draft emails
+- **Email:** reply to a thread, read attachments
+- **Calendar:** invite people to events, move an event to another time
 - **Hindi:** more phrase coverage in `translit.py`, and Hindi replies for the built-in skills (not just the AI)
 - Offline wake word (Porcupine / openWakeWord) and offline speech recognition
 - Reminders that persist across restarts
