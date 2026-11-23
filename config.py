@@ -114,4 +114,9 @@ END_SILENCE_MS = _int("END_SILENCE_MS", 600)             # this much silence end
 ONE_SEC_AFTER = _float("ONE_SEC_AFTER", 1.5)             # say "One sec" if a skill takes longer than this
 CACHE_FILE = _path("CACHE_FILE", "data/cache.json")
 CACHE_MINUTES = _int("CACHE_MINUTES", 10)                # weather and AQI
+# Daily briefing ("good morning Jarvis")
+BRIEFING_SECTIONS = [s.strip().lower() for s in _str(
+    "BRIEFING_SECTIONS", "weather,aqi,calendar,email,reminders,news").split(",") if s.strip()]
+BRIEFING_TIME = _str("BRIEFING_TIME")           # HH:MM: brief me automatically once a day when idle; empty = off
+BRIEFING_MUSIC = _str("BRIEFING_MUSIC")         # e.g. "lofi beats": played on Spotify after the briefing
 SAMPLES_DIR = _path("SAMPLES_DIR", "data/samples")       # "record samples" saves WAVs here for the benchmark

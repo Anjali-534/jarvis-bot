@@ -93,6 +93,8 @@ ROUTES = [
     ("previous song on spotify", "spotify previous"), ("what's playing", "spotify now playing"),
     ("what song is this", "spotify now playing"), ("spotify volume 50", "spotify volume"),
     ("next song", "next track"), ("pause the music", "play pause"), ("play believer", "play youtube"),
+    ("good night", "good night"), ("good night jarvis", "good night"), ("morning briefing", "morning briefing"),
+    ("brief me", "morning briefing"), ("evening wrap up", "good night"),
     ("quit spotify", "close"), ("open spotify", "open"), ("volume up", "volume up"),
 ]
 

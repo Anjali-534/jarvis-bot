@@ -130,6 +130,9 @@ def geocode(query):
 
 
 def default_place():
+    known = FALLBACK_PLACES.get(config.DEFAULT_LOCATION.strip().lower())
+    if known:
+        return known  # built-in coordinates: no network round trip (saves ~2 s on every default lookup)
     return geocode(config.DEFAULT_LOCATION) or FALLBACK_PLACES["new delhi"]
 
 

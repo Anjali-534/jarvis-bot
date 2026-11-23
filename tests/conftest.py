@@ -65,7 +65,10 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "SPOTIFY_CLIENT_ID", "")
     monkeypatch.setattr(config, "CALENDAR_REMINDERS", True)
     monkeypatch.setattr(config, "CACHE_FILE", tmp_path / "data" / "cache.json")
-    monkeypatch.setattr(config, "ENV_FILE", tmp_path / ".env")  # never rewrite the real .env
+    monkeypatch.setattr(config, "ENV_FILE", tmp_path / ".env")
+    monkeypatch.setattr(config, "BRIEFING_TIME", "")
+    monkeypatch.setattr(config, "BRIEFING_MUSIC", "")
+    monkeypatch.setattr(config, "BRIEFING_SECTIONS", ["weather", "aqi", "calendar", "email", "reminders", "news"])  # never rewrite the real .env
     from jarvis.skills import ai as ai_skill
 
     monkeypatch.setattr(ai_skill, "_switch_pending", False)
@@ -79,3 +82,6 @@ def offline(monkeypatch, tmp_path):
 
     notes.cancel_all_timers()  # a reminder must not fire into a later test (or pop a real toast)
     calendar.stop_reminders()
+    from jarvis.skills import briefing
+
+    briefing.stop_scheduler()

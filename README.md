@@ -187,6 +187,12 @@ Spotify only allows apps to control playback on **Premium** accounts. Without a 
 - "Play Believer on Spotify", "play my liked songs", "play playlist workout"
 - "Pause Spotify", "next song on Spotify", "what's playing", "Spotify volume 50"
 
+**Daily briefing**
+- "Good morning Jarvis" / "morning briefing" / "brief me": one short briefing (under 40 seconds) with the date, today's weather, AQI and mask advice for your area, the first 3 calendar events, unread email with the top 2 senders, today's reminders and one headline. Sections are fetched in parallel (6 s each); anything that fails or isn't connected is simply left out. The full version is printed in the terminal.
+- "Good night Jarvis": tomorrow's first event and weather, tomorrow's reminders, an offer to set a wake-up reminder, and the volume turned down to 20%.
+- Settings in `.env`: `BRIEFING_SECTIONS` (which sections, in order), `BRIEFING_TIME` (for example `08:30`: brief you automatically once a day, with a toast, if Jarvis is running and you've been idle for 2 minutes), `BRIEFING_MUSIC` (for example `lofi beats`, played on Spotify afterwards).
+- In Hindi mode, the briefing is spoken in Hinglish (Roman letters) if an AI key is set, otherwise in English.
+
 **Web**
 - "Play Arijit Singh songs", "play lofi beats on YouTube"
 - "Search lofi music on YouTube"
@@ -254,6 +260,7 @@ jarvis/skills/
     gmail.py            unread count, read/search email, drafts only; "connect google"
     calendar.py         today/week/next meeting, add/cancel events, reminders before events
     spotify.py          play songs/liked songs/playlists, pause/skip, now playing, volume
+    briefing.py         good morning briefing (parallel sections, 40 s budget, BRIEFING_TIME), good night
     system.py           volume, media, brightness, screenshot, battery, status, lock, power
     web.py              YouTube, Google, Google News
     whatsapp.py         WhatsApp messages, calls, contacts (data/contacts.json)

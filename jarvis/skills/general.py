@@ -63,13 +63,15 @@ CATEGORIES = {
     "spotify": ("Spotify", {"spotify", "playlist", "playlists", "liked songs", "songs"}),
     "vs code": ("VS Code", {"vs code", "vscode", "visual studio code", "code", "coding", "projects", "project", "git",
                             "github"}),
+    "briefing": ("daily briefing", {"briefing", "daily briefing", "morning briefing", "morning", "good morning",
+                                    "good night", "night", "brief"}),
     "general": ("general questions", {"general questions", "general", "questions", "maths", "math", "calculator",
                                       "jokes", "joke", "ai", "chat", "hindi", "language", "languages", "other"}),
 }
 
 SHORT_HELP = (
     "I can help with air quality, time and weather, apps, laptop controls, web, notes and reminders, "
-    "WhatsApp, email, calendar, Spotify, VS Code, and general questions. Say 'help with' and a category to hear its commands."
+    "WhatsApp, email, calendar, Spotify, VS Code, your daily briefing, and general questions. Say 'help with' and a category to hear its commands."
 )
 
 
@@ -183,6 +185,8 @@ def ai_model(ctx, command, match):
 @skill("greet", r"^(?:hi|hii|hello|hey|hey there|hi there|hello there|yo|hola|namaste|namaskar|"
                 r"good (?:morning|afternoon|evening))(?:\s+jarvis)?$", category='general', help=['hello'])
 def greet(ctx, command, match):
+    if command.startswith("good morning"):
+        return None  # "good morning jarvis" is the morning briefing
     return f"Good {time_of_day()}, {config.USER_NAME}. How can I help?"
 
 

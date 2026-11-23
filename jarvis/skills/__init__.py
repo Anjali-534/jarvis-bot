@@ -7,4 +7,5 @@ create jarvis/skills/<name>.py with @skill handlers and add it to this list befo
 """
 from jarvis.skills import (  # noqa: F401
     general, notes, gmail, calendar, spotify, system, web, whatsapp, vscode, apps, weather, aqi, knowledge, ai,
+    briefing,  # last: "good morning" falls through from the plain greeting
 )

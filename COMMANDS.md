@@ -127,6 +127,11 @@ Say "connect spotify" once first (setup steps are in the README). Playback contr
 - If Spotify isn't connected, "play X on Spotify" opens a Spotify search, and pause and next use the media keys.
 - Plain "next song" and "pause the music" always use the media keys, which work with Spotify too.
 
+## Daily briefing
+- "Good morning Jarvis" / "morning briefing" / "brief me": date, weather, AQI and mask advice, first 3 events, unread email, today's reminders, top headline. Under 40 seconds; the full version is printed.
+- "Good night Jarvis": tomorrow's first event and weather, tomorrow's reminders, offers a wake-up reminder, sets the volume to 20%.
+- Set `BRIEFING_TIME=08:30` in `.env` to get the briefing automatically each morning (once a day, when you've been idle). `BRIEFING_SECTIONS` picks the sections and their order; `BRIEFING_MUSIC` plays something on Spotify afterwards.
+
 ## VS Code
 - "Open jarvis in VS Code" / "open bogie admin project" / "work on bogie backend"
 - "New VS Code window" / "open VS Code here"
