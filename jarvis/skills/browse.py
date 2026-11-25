@@ -44,7 +44,7 @@ PAYWALLED = ("wsj.com", "ft.com", "nytimes.com", "economist.com", "bloomberg.com
 _PAYWALL_TEXT = re.compile(r"subscribe to (?:continue|read)|to continue reading|this (?:article|content) is for "
                            r"(?:subscribers|members)|already a subscriber|sign in to (?:continue|read)", re.IGNORECASE)
 COMPOUND_MODELS = ("groq/compound-mini", "groq/compound")
-DDGS_BACKENDS = ("yahoo", "auto")
+DDGS_BACKENDS = ("yahoo", "bing", "google", "duckduckgo", "brave", "mojeek")  # asked in parallel
 GRACE = 1.0  # seconds past the budget for a provider to return what it already has
 _STOP = {"the", "and", "for", "what", "who", "how", "is", "are", "was", "today", "latest", "with", "from", "about",
          "of", "in", "on", "at", "to", "a", "an", "me", "tell", "search", "web", "please", "kya", "hai", "aaj"}
@@ -248,19 +248,35 @@ def search_groq(query, deadline):
     return {"summary": summary if len(sources) > 1 else "", "sources": sources[:RESULTS]}
 
 
-def ddgs_text(query):
-    """[{title, href, body}] via the ddgs package (free, no key). Its engines are flaky ("No results found."):
-    measured here, yahoo answered every time in about 1.2 s, so it goes first, then ddgs picks ("auto")."""
+def ddgs_backend(query, backend):
     from ddgs import DDGS
 
-    last = None
-    for backend in DDGS_BACKENDS:
+    return DDGS(timeout=4).text(query, max_results=RESULTS, region="in-en", backend=backend) or []
+
+
+def ddgs_text(query):
+    """[{title, href, body}] via the ddgs package (free, no key). Its engines are flaky: each one answers
+    "No results found." for some queries (measured Nov 2026, every engine failed on at least one of three
+    everyday questions). Trying them in turn used up the whole budget, so they are asked in parallel and
+    the first non-empty answer wins; the rest finish in the background."""
+    import queue
+
+    answers = queue.Queue()
+
+    def ask(backend):
         try:
-            results = DDGS(timeout=4).text(query, max_results=RESULTS, region="in-en", backend=backend)
-            if results:
-                return results
-        except Exception as exc:  # "No results found." happens now and then
-            last = exc
+            answers.put((backend, ddgs_backend(query, backend), None))
+        except Exception as exc:  # noqa: BLE001 - "No results found." happens now and then
+            answers.put((backend, [], exc))
+
+    for backend in DDGS_BACKENDS:
+        threading.Thread(target=ask, args=(backend,), name=f"ddgs-{backend}", daemon=True).start()
+    last = None
+    for _ in DDGS_BACKENDS:
+        backend, results, error = answers.get()  # the caller's within() bounds the wait
+        if results:
+            return results
+        last = error or last
     if last:
         raise last
     return []

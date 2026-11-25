@@ -77,7 +77,7 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")  # backup tests switch it on
     from jarvis.skills import browse
 
-    for name in ("ddgs_text", "tavily_search", "download"):  # no real web search in tests
+    for name in ("ddgs_text", "ddgs_backend", "tavily_search", "download"):  # no real web search in tests
         monkeypatch.setattr(browse, name, forbidden)
     monkeypatch.setattr(browse.webbrowser, "open", forbidden)
     monkeypatch.setattr(config, "SEARCH_PROVIDER", "auto")

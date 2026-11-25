@@ -11,6 +11,8 @@ from jarvis import cache, http
 from jarvis.router import handle
 from jarvis.skills import browse
 
+REAL_DDGS_TEXT = browse.ddgs_text  # conftest blocks it; the race tests below call the real one
+
 GROQ = "https://api.groq.com/openai/v1"
 PETROL_PAGE = ("Petrol price in Delhi\n" + "Delhi is the capital of India and fuel prices matter to everyone. " * 30 +
                "\nOn 23 November 2026 petrol in Delhi costs Rs 94.77 per litre, unchanged from yesterday.\n" +
@@ -419,3 +421,28 @@ def test_maths_and_jokes_dont_browse(routing, phrase, skill_name):
 def test_current_role_questions_skip_wikipedia(routing):
     routing["route_reply"].append(tool_call("web_search", query="current CEO of Twitter"))
     assert handle(make_ctx(), "who is the current ceo of twitter") == "web search"
+
+
+# ---------------------------------------------------------------- ddgs engines asked in parallel
+def test_ddgs_engines_race_and_first_real_answer_wins(monkeypatch):
+    monkeypatch.setattr(browse, "DDGS_BACKENDS", ("dead", "slow", "good"))
+    hit = [{"title": "t", "href": "https://x.com", "body": "b"}]
+
+    def backend(query, name):
+        if name == "dead":
+            raise RuntimeError("No results found.")
+        if name == "slow":
+            time.sleep(5)
+        return hit
+
+    monkeypatch.setattr(browse, "ddgs_backend", backend)
+    started = time.monotonic()
+    assert REAL_DDGS_TEXT("q") == hit
+    assert time.monotonic() - started < 1  # neither the failure nor the slow engine held it up
+
+
+def test_ddgs_every_engine_failing_raises(monkeypatch):
+    monkeypatch.setattr(browse, "DDGS_BACKENDS", ("a", "b"))
+    monkeypatch.setattr(browse, "ddgs_backend", lambda q, n: (_ for _ in ()).throw(RuntimeError("No results found.")))
+    with pytest.raises(RuntimeError):
+        REAL_DDGS_TEXT("q")
