@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 import config
-from jarvis import geo, http
+from jarvis import geo, http, persona
 from jarvis.geo import Place
 from jarvis.router import skill
 
@@ -128,6 +128,11 @@ def reading_for(ctx, command):
     return fetch_air([geo.current_place(ctx, command)])[0]
 
 
+def friendly(reading):
+    """Friend mode: "Bahar mat ja yaar, AQI 312 hai. Mask pehen ke hi nikalna" (None in professional mode)."""
+    return persona.aqi_line(reading.place.name, reading.aqi, reading.category, reading.advice)
+
+
 def summary(reading):
     return (f"The AQI in {reading.place.name} is {reading.aqi}, which is {reading.category}, "
             f"a {reading.zone.lower()} zone.")
@@ -239,11 +244,14 @@ _OUTDOOR = r"(?:go|step|walk|run|jog|exercise|play|cycle|be)\b"
        r"\bgo (?:out|outside)\b.*\b(?:safe|okay|ok)\b", category='air quality', help=['is it safe to go out', 'do I need a mask'])
 def safe_outside(ctx, command, match):
     reading = reading_for(ctx, command)
-    return f"{summary(reading)} {reading.advice}"
+    return friendly(reading) or f"{summary(reading)} {reading.advice}"
 
 
 @skill("aqi", r"\ba\.?\s?q\.?\s?i\b", r"\bair quality\b", r"\bpollution\b", r"\bsmog\b", r"\bhow is the air\b",
        r"\bair index\b", category='air quality', help=["what's the AQI", 'air quality in Noida'], tool="air_quality", also=("pm2.5", "pm10", "no2"), params={"place?": "area, city or pincode in India", "pollutant?": ["aqi", "pm2.5", "pm10", "no2"]}, command=lambda a: a.get("pollutant", "aqi") + (f" in {a['place']}" if a.get("place") else ""))
 def aqi_skill(ctx, command, match):
     reading = reading_for(ctx, command)
+    friend = friendly(reading)
+    if friend:
+        return f"{friend} Main culprit: {SPOKEN[reading.dominant]}."
     return f"{summary(reading)} The main pollutant is {SPOKEN[reading.dominant]}. {reading.advice}"

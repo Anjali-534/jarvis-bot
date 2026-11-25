@@ -148,6 +148,12 @@ Say "connect spotify" once first (setup steps are in the README). Playback contr
 - "Pull jarvis" (asks first; Jarvis never pushes, commits or resets)
 - "Run bogie backend" (asks first, opens a new terminal)
 
+## Personality
+Jarvis talks like a close friend by default (casual Hinglish: "Ho gaya!", "Kya bola? Phir se bol na"). Set `PERSONALITY=professional` in `.env` for the polite assistant, and `NICKNAME` for what it calls you.
+- "Talk professionally" / "formal mode": polite assistant for this session
+- "Be my friend again" / "friend mode": back to friend mode
+- "I'm tired" / "I'm bored" / "bore ho rahi hoon" / "I'm stressed" / "I'm so happy": a short, friendly reply (a break, music, a joke)
+
 ## General questions
 - "What is 25 times 4" / "what is 10 percent of 250" / "what is the square root of 144"
 - "Who is Sachin Tendulkar" / "tell me about the Taj Mahal"
@@ -155,7 +161,7 @@ Say "connect spotify" once first (setup steps are in the README). Playback contr
 - Anything else goes to the AI: "do you know Hindi", "write a 2 line poem about Delhi winters"
 - "Forget our conversation" (clears the AI's memory)
 - "Which AI model are you using" (if a model is retired, Jarvis switches to a newer one by itself and tells you once; it also says whether the Gemini backup is in use)
-- **Hindi / Hinglish:** talk to the AI in Hinglish and it replies in Hinglish, written in English letters so the voice can read it.
+- **Hindi / Hinglish:** talk to the AI in Hinglish and it replies in Hinglish, written in English letters.
 - "Switch to Hindi" makes Jarvis listen for Hindi. "Switch to English" switches back. This lasts for the current session only.
 
 ## Say it your way

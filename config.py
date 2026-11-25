@@ -38,14 +38,22 @@ def _path(name, default):
 
 ASSISTANT_NAME = _str("ASSISTANT_NAME", "Jarvis")
 USER_NAME = _str("USER_NAME", "Anjali")
+# friend = casual Delhi Hinglish, warm and a bit witty; professional = the polite assistant
+PERSONALITY = _str("PERSONALITY", "friend").lower()
+NICKNAME = _str("NICKNAME", USER_NAME)  # what Jarvis calls you in friend mode
 
 WAKE_WORD_ENABLED = _bool("WAKE_WORD_ENABLED", True)
 WAKE_WORDS = [w.strip().lower() for w in _str("WAKE_WORDS", "jarvis,hey jarvis,ok jarvis").split(",") if w.strip()]
 FOLLOW_UP_SECONDS = _int("FOLLOW_UP_SECONDS", 20)
 
 SPEECH_LANGUAGE = _str("SPEECH_LANGUAGE", "en-IN")
-VOICE_NAME = _str("VOICE_NAME", "zira")
+VOICE_NAME = _str("VOICE_NAME", "zira")   # pyttsx3 (Windows) voice: the offline fallback
 VOICE_RATE = _int("VOICE_RATE", 185)
+# edge = Microsoft's free neural voices via edge-tts (needs internet; falls back to pyttsx3); pyttsx3 = offline only
+TTS_ENGINE = _str("TTS_ENGINE", "edge").lower()
+TTS_VOICE = _str("TTS_VOICE", "hi-IN-SwaraNeural")  # best on mixed Hinglish in tests; reads Devanagari too
+TTS_RATE = _str("TTS_RATE", "+5%")                 # edge-tts speaking rate, e.g. -10%, +0%, +15%
+TTS_TIMEOUT = float(_str("TTS_TIMEOUT", "4"))      # seconds to wait for edge-tts before using pyttsx3
 
 DEFAULT_LOCATION = _str("DEFAULT_LOCATION", "New Delhi")
 COUNTRY_CODE = _str("COUNTRY_CODE", "in")
@@ -114,6 +122,7 @@ PHRASE_LIMIT = _float("PHRASE_LIMIT", 7.0)               # longest single comman
 END_SILENCE_MS = _int("END_SILENCE_MS", 600)             # this much silence ends the command
 ONE_SEC_AFTER = _float("ONE_SEC_AFTER", 1.5)             # say "One sec" if a skill takes longer than this
 CACHE_FILE = _path("CACHE_FILE", "data/cache.json")
+TTS_CACHE_DIR = _path("TTS_CACHE_DIR", "data/tts_cache")  # short phrases spoken often, as mp3
 CACHE_MINUTES = _int("CACHE_MINUTES", 10)                # weather and AQI
 # Daily briefing ("good morning Jarvis")
 BRIEFING_SECTIONS = [s.strip().lower() for s in _str(

@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable
 
+from jarvis import persona
+
 log = logging.getLogger(__name__)
 
 
@@ -125,9 +127,10 @@ class Context:
     def say(self, text, wait=True):
         if text:
             pending, self._one_sec = self._one_sec, None
-            if pending is not None and text != ONE_SEC:
+            one_sec = _is_one_sec(text)
+            if pending is not None and not one_sec:
                 pending.cancel()  # the skill spoke in time
-            if text != ONE_SEC:
+            if not one_sec:
                 self.state["last_said"] = text
             self.voice.speak(text, wait=wait)
 
@@ -142,6 +145,10 @@ class Context:
 ONE_SEC = "One sec."
 
 
+def _is_one_sec(text):
+    return text == ONE_SEC or persona.is_line("one_sec", text)
+
+
 def _start_one_sec(ctx):
     """Say "One sec." if the skill hasn't said anything after ONE_SEC_AFTER seconds (slow network calls)."""
     import config
@@ -153,7 +160,7 @@ def _start_one_sec(ctx):
     def fire():
         if ctx._one_sec is timer:  # still waiting and nothing said yet
             ctx._one_sec = None
-            ctx.say(ONE_SEC, wait=False)
+            ctx.say(persona.line("one_sec"), wait=False)
 
     timer = threading.Timer(delay, fire)
     timer.daemon = True
@@ -221,14 +228,16 @@ def _run_handler(ctx, sk, command, match):
 
         if http.is_request_error(exc):
             log.warning(f"[{sk.name}] network error: {exc}")
-            return "I couldn't reach the online service right now. Please check your internet and try again."
+            return persona.line("network_error")
         log.exception("Skill %s crashed", sk.name)
-        return "Sorry, something went wrong while doing that."
+        return persona.line("error")
 
 
 def _deliver(ctx, sk, result):
     ctx.last_skill = sk.name
     if isinstance(result, str) and result:
+        if sk is not FALLBACK:  # fixed skill replies get the friend's openers; the AI already has the style
+            result = persona.restyle(result)
         ctx.say(result)
     return sk.name
 
@@ -272,8 +281,11 @@ def handle(ctx, command):
             handled = _deliver(ctx, FALLBACK, result or "")
     if handled:
         remember_turn(ctx, command, handled)
+        nudge = persona.late_night_nudge(ctx.state) if persona.is_friend() and handled != "exit" else None
+        if nudge:
+            ctx.say(nudge)
         return handled
-    ctx.say("Sorry, I don't know how to do that yet.")
+    ctx.say(persona.line("dont_know"))
     return None
 
 

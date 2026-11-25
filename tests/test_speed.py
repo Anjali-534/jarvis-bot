@@ -255,6 +255,7 @@ def make_voice(frames=(), wake=None, wake_failed=False, stt_engine=None):
     v.text_mode, v.mute = False, True
     v._language = "en-IN"
     v._queue, v._tts_ok, v._thread = queue.Queue(), False, None
+    v._pending, v._neural, v._player = {}, None, None
     v._stop_speech, v._cancel_wait = threading.Event(), threading.Event()
     v._hushed, v.last_wake = False, False
     v.mic, v.detector = FakeMic(frames), FakeDetector()

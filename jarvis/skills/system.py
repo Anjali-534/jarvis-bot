@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 
 import config
+from jarvis import persona
 from jarvis.router import skill
 from jarvis.timeparse import find_duration, say_duration
 
@@ -212,7 +213,7 @@ def power(ctx, command, match):
     action, flag = ("restart", "/r") if restart else ("shut down", "/s")
     found = find_duration(command)
     delay = min(found[0], 315360000) if found else 15
-    if not ctx.confirm(f"Are you sure you want to {action} the laptop in {say_duration(delay)}?"):
+    if not ctx.confirm(persona.line("confirm_power", action=action, delay=say_duration(delay))):
         return f"Okay, I won't {action} the laptop."
     result = run(["shutdown", flag, "/t", str(delay)])
     if result.returncode != 0:

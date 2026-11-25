@@ -12,6 +12,7 @@ import logging
 import queue
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import config
 from jarvis import timing
@@ -22,10 +23,13 @@ CALIBRATE_SECONDS = 0.5
 WAKE_POLL_SECONDS = 1.0  # listen(wake=True) returns "" this often so the main loop can check its flags
 
 
-def speakable(text):
-    """Windows voices can't read Devanagari, so speak it in Roman letters ("मैं लेट हूँ" -> "main let hun")."""
+def speakable(text, hindi_voice=False):
+    """Windows and English voices can't read Devanagari, so speak it in Roman letters ("मैं लेट हूँ" -> "main let
+    hun"). A Hindi neural voice (hi-IN-...) reads Devanagari itself."""
     from jarvis import translit
 
+    if hindi_voice:
+        return text
     return translit.to_roman(text) if translit.has_devanagari(text) else text
 
 
@@ -48,6 +52,8 @@ class Voice:
         self.mute = mute
         self._language = config.SPEECH_LANGUAGE  # "switch to hindi" changes this for the session
         self._queue = queue.Queue()
+        self._pending = {}            # done event -> Future with that sentence's neural audio (mp3 bytes)
+        self._neural = self._player = None
         self._tts_ok = False
         self._thread = None
         self._stop_speech = threading.Event()
@@ -85,24 +91,59 @@ class Voice:
             prepare(code)  # Whisper: start loading the Hindi model now, not on the first Hindi command
 
     # ---------------------------------------------------------------- text to speech
+    def _start_neural(self):
+        """edge-tts + pygame (background thread: importing edge-tts takes several seconds on a slow laptop, so the
+        Windows voice speaks until it's ready). Sets self._neural / self._player."""
+        from jarvis import tts
+
+        try:
+            player = tts.Player()
+            self._synth_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="tts-synth")
+            neural = tts.EdgeTTS()
+            self._player, self._neural = player, neural
+            threading.Thread(target=tts.pregenerate, args=(neural,), kwargs={"busy": self._busy}, name="tts-cache",
+                             daemon=True).start()
+            log.info("[voice] Neural voice ready: %s", neural.voice)
+        except Exception as exc:
+            self._neural = self._player = None
+            log.warning(f"[voice] Neural voice unavailable ({exc}); using the Windows voice. "
+                        "pip install edge-tts pygame")
+
+    def _busy(self):
+        return bool(self._pending) or not self._queue.empty()
+
+    @staticmethod
+    def _start_sapi():
+        """pyttsx3 (Windows SAPI): the offline voice. Returns (engine, sapi) or raises."""
+        try:
+            import comtypes
+
+            comtypes.CoInitialize()
+        except Exception:
+            pass
+        import pyttsx3
+
+        engine = pyttsx3.init()
+        Voice._select_voice(engine)
+        engine.setProperty("rate", config.VOICE_RATE)
+        engine.setProperty("volume", 1.0)
+        sapi = getattr(getattr(getattr(engine, "proxy", None), "_driver", None), "_tts", None)
+        if sapi is not None:
+            sapi.EventInterests = 0  # we poll instead of using pyttsx3's event loop
+        return engine, sapi
+
     def _tts_worker(self, ready):
         engine = sapi = None
+        neural = config.TTS_ENGINE == "edge"
+        if neural:
+            threading.Thread(target=self._start_neural, name="tts-neural-load", daemon=True).start()
         try:
             try:
-                import comtypes
-
-                comtypes.CoInitialize()
-            except Exception:
-                pass
-            import pyttsx3
-
-            engine = pyttsx3.init()
-            self._select_voice(engine)
-            engine.setProperty("rate", config.VOICE_RATE)
-            engine.setProperty("volume", 1.0)
-            sapi = getattr(getattr(getattr(engine, "proxy", None), "_driver", None), "_tts", None)
-            if sapi is not None:
-                sapi.EventInterests = 0  # we poll instead of using pyttsx3's event loop
+                engine, sapi = self._start_sapi()
+            except Exception as exc:
+                if not neural:
+                    raise
+                log.warning(f"[voice] Offline voice unavailable ({exc}); the neural voice has no fallback.")
             self._tts_ok = True
         except Exception as exc:
             log.warning(f"[voice] Text-to-speech unavailable ({exc}); I'll print replies instead.")
@@ -115,18 +156,51 @@ class Voice:
             if item is None:
                 break
             text, done = item
+            audio = self._pending.pop(done, None)
             try:
                 if self._stop_speech.is_set() or not text:  # "" is wait_idle()'s marker
                     continue
+                if audio is not None and self._play_neural(audio):
+                    continue
                 if sapi is not None:
                     self._speak_sapi(sapi, text)
-                else:  # not Windows SAPI: can't be interrupted mid-sentence
+                elif engine is not None:  # not Windows SAPI: can't be interrupted mid-sentence
                     engine.say(text)
                     engine.runAndWait()
             except Exception as exc:
                 log.warning(f"[voice] TTS error: {exc}")
             finally:
                 done.set()
+
+    def _play_neural(self, audio):
+        """Play a sentence synthesised in the background. False if it failed (then the offline voice says it)."""
+        try:
+            mp3 = audio.result(timeout=config.TTS_TIMEOUT + 1)
+        except Exception as exc:
+            if self._neural is not None:
+                self._neural.mark_down(str(exc)[:80] or exc.__class__.__name__)
+            return False
+        if self._stop_speech.is_set():
+            return True
+        started = time.perf_counter()
+        self._player.play(mp3, self._stop_speech)
+        log.debug("[voice] played %.1f s of neural speech", time.perf_counter() - started)
+        return True
+
+    def _synthesise(self, text):
+        """Start downloading this sentence's audio now, so it's ready when its turn comes (None: offline voice)."""
+        neural = getattr(self, "_neural", None)
+        if neural is None or not neural.available:
+            return None
+        try:
+            return self._synth_pool.submit(neural.synth, text)
+        except RuntimeError:  # pool shut down
+            return None
+
+    @property
+    def _hindi_voice(self):
+        neural = getattr(self, "_neural", None)
+        return neural is not None and neural.available and neural.voice.lower().startswith("hi-")
 
     def _speak_sapi(self, sapi, text):
         sapi.Speak(text, 1)  # SVSFlagsAsync
@@ -152,7 +226,11 @@ class Voice:
             return
         self._stop_speech.clear()
         done = threading.Event()
-        self._queue.put((speakable(text), done))
+        spoken = speakable(text, self._hindi_voice)
+        audio = self._synthesise(spoken)
+        if audio is not None:
+            self._pending[done] = audio
+        self._queue.put((spoken, done))
         if wait:
             started = time.perf_counter()
             done.wait(timeout=120)
@@ -177,6 +255,7 @@ class Voice:
                 _, done = self._queue.get_nowait()
             except queue.Empty:
                 break
+            self._pending.pop(done, None)
             done.set()
 
     def cancel_wait(self):

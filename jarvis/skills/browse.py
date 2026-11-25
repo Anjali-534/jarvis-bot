@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote_plus, urlparse
 
 import config
-from jarvis import cache, http, timing
+from jarvis import cache, http, persona, timing
 from jarvis.router import on_startup, skill
 
 log = logging.getLogger(__name__)
@@ -434,7 +434,7 @@ def answer_prompt(question, found, detail=False, hinglish=False, earlier=None):
         f"You are {config.ASSISTANT_NAME}, a voice assistant. Today is {datetime.now():%A %d %B %Y}. "
         f"Answer the question using ONLY the numbered {what} below (found {found['at']}), never your own "
         "knowledge. Your reply is spoken: " + length + ", plain speech, no markdown, no URLs, no [1] numbers. "
-        "Start with the answer itself. "
+        "Start with the answer itself. " + persona.ai_style() +
         "For time-sensitive facts (prices, scores, results, news, who holds a job now) say the date they apply to. "
         "If the question leaves out a detail (which match, which city, which model), answer for the most relevant "
         "or most recent one in the sources and name it, for example: India vs Australia on 24 November: India won "
@@ -541,10 +541,10 @@ def look_up(ctx, query, question=None, earlier=None):
     question = question or query
     cached = cache.get("browse|" + re.sub(r"\s+", " ", query).strip().lower(), config.SEARCH_CACHE_MINUTES * 60)
     if not cached:
-        ctx.say(CHECKING, wait=False)  # spoken in the background while the search runs
+        ctx.say(persona.line("checking_online"), wait=False)  # spoken in the background while the search runs
     found = search(query)
     if not found:
-        return NOTHING_FOUND
+        return persona.line("nothing_found")
     return speak_answer(ctx, question, found, earlier=earlier)
 
 

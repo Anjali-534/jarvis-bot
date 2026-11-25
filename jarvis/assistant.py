@@ -10,7 +10,7 @@ import threading
 import time
 
 import config
-from jarvis import timing
+from jarvis import persona, timing
 from jarvis.router import Context, handle, run_startup
 
 log = logging.getLogger(__name__)
@@ -171,7 +171,7 @@ class Assistant:
             if not self.wake_enabled and not self.ctx.sleeping:
                 self._misses += 1
                 if self._misses >= 2:
-                    self.ctx.say("Sorry, I didn't catch that.")
+                    self.ctx.say(persona.line("didnt_catch"))
                     self._misses = 0
             return None
         self._misses = 0
@@ -186,14 +186,14 @@ class Assistant:
             self.ctx.sleeping = False
             self._notify_status()
             if not command:
-                self.ctx.say("I'm back. Yes?")
+                self.ctx.say(persona.line("back"))
                 self._last_reply = time.monotonic()
                 return None
         elif self.wake_enabled and not woke and time.monotonic() - self._last_reply > config.FOLLOW_UP_SECONDS:
             return None
         handled = None
         if not command:
-            self.ctx.say("Yes?")
+            self.ctx.say(persona.line("yes"))
         else:
             turn = timing.current()
             tts_before = turn.durations.get("tts", 0.0) if turn else 0.0
@@ -207,9 +207,7 @@ class Assistant:
         return handled
 
     def greet(self):
-        from jarvis.skills.general import time_of_day
-
-        self.ctx.say(f"Good {time_of_day()}, {config.USER_NAME}. {config.ASSISTANT_NAME} is online.")
+        self.ctx.say(persona.online_greeting())
         name = config.ASSISTANT_NAME
         if self.wake_enabled and getattr(self.voice, "offline_wake", False):
             log.info("Say 'Hey Jarvis', wait for the beep, then say 'help' to hear what I can do. "
@@ -234,7 +232,7 @@ class Assistant:
                     continue
                 self.listen_once()
         except KeyboardInterrupt:
-            self.ctx.say(f"Goodbye, {config.USER_NAME}.")
+            self.ctx.say(persona.line("goodbye_short"))
         finally:
             self.ctx.running = False
             if self.on_exit:

@@ -47,6 +47,17 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(calendar, "schedule_alert", forbidden)
 
     monkeypatch.setattr(config, "USER_NAME", "Anjali")
+    # Personality: the original professional wording, always the first variant (friend tests switch it on)
+    from jarvis import persona
+
+    monkeypatch.setattr(config, "PERSONALITY", "professional")
+    monkeypatch.setattr(config, "NICKNAME", "Anjali")
+    monkeypatch.setattr(persona, "_session_mode", None)
+    monkeypatch.setattr(persona, "choose", lambda options: options[0])
+    monkeypatch.setattr(persona, "AVOID_REPEAT", False)
+    monkeypatch.setattr(config, "TTS_ENGINE", "pyttsx3")  # no neural voice downloads
+    monkeypatch.setattr(config, "TTS_VOICE", "en-IN-NeerjaNeural")
+    monkeypatch.setattr(config, "TTS_CACHE_DIR", tmp_path / "data" / "tts_cache")
     monkeypatch.setattr(config, "WAQI_TOKEN", "")
     monkeypatch.setattr(config, "AI_API_KEY", "")
     monkeypatch.setattr(config, "AI_PROVIDER", "openai")  # tests that need Gemini switch it on

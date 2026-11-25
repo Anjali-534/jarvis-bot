@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 
 import config
+from jarvis import persona
 from jarvis.router import skill, speak_list
 from jarvis.timeparse import NUMBER_WORDS
 
@@ -31,7 +32,7 @@ def time_of_day(now=None):
 )
 def exit_skill(ctx, command, match):
     ctx.running = False
-    return f"Goodbye, {config.USER_NAME}. Stay safe!"
+    return persona.line("goodbye")
 
 
 @skill("sleep", r"\bgo to sleep\b", r"\bstop listening\b", r"\bsleep mode\b", r"\bpause listening\b", category='general', help=['go to sleep', 'stop listening'])
@@ -39,7 +40,7 @@ def sleep_skill(ctx, command, match):
     if PC_WORDS.search(command):
         return None  # "put the laptop to sleep" belongs to the system skill
     ctx.sleeping = True
-    return f"Okay, going to sleep. Say {config.ASSISTANT_NAME} when you need me."
+    return persona.line("sleep")
 
 
 # ---------------------------------------------------------------- help
@@ -66,7 +67,8 @@ CATEGORIES = {
     "briefing": ("daily briefing", {"briefing", "daily briefing", "morning briefing", "morning", "good morning",
                                     "good night", "night", "brief"}),
     "general": ("general questions", {"general questions", "general", "questions", "maths", "math", "calculator",
-                                      "jokes", "joke", "ai", "chat", "hindi", "language", "languages", "other"}),
+                                      "jokes", "joke", "ai", "chat", "hindi", "language", "languages", "other",
+                                      "personality", "friend mode", "mood", "feelings"}),
 }
 
 SHORT_HELP = (
@@ -197,26 +199,66 @@ def ai_model(ctx, command, match):
 def greet(ctx, command, match):
     if command.startswith("good morning"):
         return None  # "good morning jarvis" is the morning briefing
-    return f"Good {time_of_day()}, {config.USER_NAME}. How can I help?"
+    return persona.line("hello", part_of_day=time_of_day())
 
 
 @skill("who are you", r"\bwho are you\b", r"\bwhat(?:'s| is) your name\b", r"\bintroduce yourself\b", category='general', help=['who are you'])
 def who_are_you(ctx, command, match):
-    return (f"I'm {config.ASSISTANT_NAME}, your personal voice assistant. "
-            "I can check air quality and weather, open apps, set reminders and much more. Say help to hear it all.")
+    return persona.line("who_are_you")
 
 
 @skill("how are you", r"\bhow are you\b", r"\bhow(?:'s| is) it going\b", r"\bhow do you do\b", category='general', help=['how are you'])
 def how_are_you(ctx, command, match):
-    return random.choice([
-        f"I'm running smoothly, thanks for asking, {config.USER_NAME}. How about you?",
-        "All systems online and feeling great. What can I do for you?",
-    ])
+    return persona.line("how_are_you")
 
 
 @skill("thanks", r"^(?:thanks?|thank you|thank you so much|thanks a lot|thx|shukriya|dhanyavaad|dhanyawad)(?:\s+jarvis)?$", category='general', help=['thank you'])
 def thanks(ctx, command, match):
-    return random.choice(["You're welcome!", "Happy to help.", f"Any time, {config.USER_NAME}."])
+    return persona.line("thanks")
+
+
+# ---------------------------------------------------------------- how you're feeling, and the personality
+_FEELING = (r"\b(?:i'?m|i am|feeling|feel)\s+(?:so\s+|very\s+|really\s+|a bit\s+|kinda\s+)?(?:tired|exhausted|sleepy|"
+            r"drained|bored|stressed|anxious|tense|overwhelmed|worried|sad|low|down|upset|lonely|happy|great|awesome|"
+            r"excited|amazing|hungry|starving)\b",
+            r"\b(?:thak (?:gayi|gaya|gai|gya)|thaki (?:hui|hu)|neend aa rahi|bore ho (?:rahi|raha|rhi|rha)|"
+            r"boring (?:lag|ho) raha|tension (?:ho rahi|hai)|stress (?:ho raha|hai)|udaas|mood (?:off|kharab)|"
+            r"bahut khush|maza aa (?:gaya|raha)|bhook?h lagi)\b")
+
+
+_NOT_A_MOOD = re.compile(r"\b(?:low|down|great|happy)\s+(?:on|to|at|with|of|about|for)\b")
+
+
+@skill("feeling", *_FEELING, category="general", help=["I'm tired", "I'm bored", "bore ho rahi hoon"])
+def feeling(ctx, command, match):
+    """Like a friend: short and caring (a break, music, a joke), not a lecture."""
+    if "?" in command or command.startswith(("are you", "r u")) or _NOT_A_MOOD.search(command):
+        return None  # "i'm low on battery", "i'm down to 10 percent", "i'm great at maths"
+    mood = persona.feeling(command)
+    if mood is None or len(command.split()) > 12:  # a long sentence is probably asking something: the AI
+        return None
+    return persona.line("feel_" + mood)
+
+
+@skill("professional mode", r"^(?:please\s+)?(?:talk|speak|be)\s+(?:more\s+)?(?:professional(?:ly)?|formal(?:ly)?)$",
+       r"^(?:switch to\s+|go\s+)?(?:formal|professional)(?:\s+mode)?$", category="general",
+       help=["talk professionally", "formal mode"])
+def professional_mode(ctx, command, match):
+    if not persona.is_friend():
+        return persona.line("already_professional")
+    persona.set_mode(persona.PROFESSIONAL)
+    return persona.line("mode_professional")
+
+
+@skill("friend mode", r"^(?:please\s+)?be my (?:friend|dost|buddy) again$", r"^(?:please\s+)?be my (?:friend|dost)$",
+       r"^(?:switch to\s+|go\s+)?(?:friend|friendly|dost|casual)(?:\s+mode)?$",
+       r"^(?:talk|speak)\s+(?:like a friend|casually|normally)(?:\s+again)?$", category="general",
+       help=["be my friend again", "friend mode"])
+def friend_mode(ctx, command, match):
+    if persona.is_friend():
+        return persona.line("already_friend")
+    persona.set_mode(persona.FRIEND)
+    return persona.line("mode_friend")
 
 
 @skill("time", r"\bwhat(?:'s| is)? (?:the )?time\b", r"\bwhat time\b", r"\btime (?:is it|now)\b", r"^(?:the )?time$",

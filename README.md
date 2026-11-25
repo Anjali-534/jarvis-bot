@@ -22,7 +22,9 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 | `AI_PROVIDER` | `gemini` or `openai`. If empty, it's `gemini` when `AI_BASE_URL` is a `generativelanguage.googleapis.com` URL, otherwise `openai`. |
 | `WAQI_TOKEN` | A free token from <https://aqicn.org/data-platform/token/>. Red zones then come from real CPCB monitoring stations. |
 | `DEFAULT_LOCATION` | Used until you tell Jarvis your area. Defaults to New Delhi. |
-| `VOICE_NAME`, `VOICE_RATE` | Part of a Windows voice name (`zira`, `david`, `heera`...) and the speaking speed. |
+| `PERSONALITY`, `NICKNAME` | `friend` (default: talks like a close Delhi friend, in casual Hinglish) or `professional`, and what Jarvis calls you. See [Personality and voice](#personality-and-voice). |
+| `TTS_ENGINE`, `TTS_VOICE`, `TTS_RATE` | `edge` (default: Microsoft's free neural voices, needs internet) or `pyttsx3` (offline Windows voice); the neural voice (default `hi-IN-SwaraNeural`) and its speed. |
+| `VOICE_NAME`, `VOICE_RATE` | The offline fallback voice: part of a Windows voice name (`zira`, `david`, `heera`...) and its speed. |
 | `WAKE_WORDS`, `FOLLOW_UP_SECONDS` | The wake phrases, and how long you can keep talking without one after a reply. |
 | `WHATSAPP_SEND_DELAY` | Seconds to wait for WhatsApp to open a chat before pressing Enter (default 3). |
 | `SPOTIFY_CLIENT_ID` | Lets Jarvis control Spotify (see [Connecting Google and Spotify](#connecting-google-and-spotify)). |
@@ -92,7 +94,7 @@ With no microphone, Jarvis switches to text mode automatically. After it replies
 - **One microphone stream, opened once.** The old code reopened the mic for every phrase (about 250 ms each time).
 - **End of speech.** A command ends after **600 ms of silence** (`END_SILENCE_MS`). Silence is detected with webrtcvad plus an energy threshold of the calibrated room level × 1.3. Jarvis waits up to 5 seconds for you to start (`LISTEN_TIMEOUT`), and a command can be up to 7 seconds long (`PHRASE_LIMIT`). It re-measures the room quietly after 10 idle minutes, or when you say **"recalibrate mic"**.
 - **Speech-to-text.** `STT_ENGINE=google` (default) or `whisper`. Whisper runs locally with faster-whisper (`base.en` for English, `small` for Hindi). It uses CUDA when an NVIDIA GPU is available, otherwise the CPU with int8. The model loads in the background, and Google is used until it's ready. To see which is faster on your laptop, say **"record samples"** (5 short phrases saved to `data\samples\`), then run `python -m jarvis.benchmark`.
-- **Snappier replies.** The voice speaks at 185 words a minute (`VOICE_RATE`). If a skill takes more than 1.5 seconds (`ONE_SEC_AFTER`), Jarvis says "One sec" first. Network calls time out after 6 seconds, the AI after 15. Weather and AQI are cached on disk for 10 minutes (`CACHE_MINUTES`) and place lookups for 30 days, in `data\cache.json`.
+- **Snappier replies.** Common short replies ("Ho gaya!", "Haan, bolo?") are cached as audio and start in about 30 ms. If a skill takes more than 1.5 seconds (`ONE_SEC_AFTER`), Jarvis says "One sec" first. Network calls time out after 6 seconds, the AI after 15. Weather and AQI are cached on disk for 10 minutes (`CACHE_MINUTES`) and place lookups for 30 days, in `data\cache.json`.
 - **Barge-in.** Pressing **Ctrl+Alt+J** while Jarvis is talking stops it immediately and starts listening.
 - **Startup.** Heavy libraries (requests, pyautogui, pystray, Whisper, openWakeWord) are loaded only when needed or in the background. Run with `--timing` to see where each turn's time goes, for example `[timing] wake word at 0.00s | speech detected at 0.41s | end of phrase at 1.92s | speech-to-text 0.55s | routing + skill 0.02s | text-to-speech 1.80s`.
 
@@ -137,6 +139,18 @@ The permissions are `gmail.readonly`, `gmail.compose` (drafts) and `calendar.eve
 5. Say **"connect spotify"** and log in. The token is cached in `data\spotify_token.json`.
 
 Spotify only allows apps to control playback on **Premium** accounts. Without a connection, "play X on Spotify" opens a search in the Spotify app instead.
+
+## Personality and voice
+
+**Friend mode** (`PERSONALITY=friend`, the default) makes Jarvis talk like a close friend from Delhi: casual Hinglish in Roman letters ("arre", "yaar", "chal", "haan bata", "done!"), warm and a bit witty, short. It's still honest: it tells you when you're wrong, says when it doesn't know, never makes up facts, and risky actions still need your yes ("Pakka shut down kar doon? 15 seconds mein"). `PERSONALITY=professional` keeps the polite assistant. Say **"talk professionally"** / **"formal mode"** or **"be my friend again"** / **"friend mode"** to switch for the session. `NICKNAME` is what it calls you.
+
+- Fixed replies live in `jarvis/persona.py`, with 3 to 5 variants each per personality (picked at random, never the same one twice in a row): greetings by time of day ("Good morning Anjali! Chai pi li?"), done ("Ho gaya!", "Lo, kar diya"), didn't catch ("Kya bola? Phir se bol na"), reminders ("Oye Anjali! Yaad hai na, pani peena hai"), AQI ("Bahar mat ja yaar, AQI 312 hai. Mask pehen ke hi nikalna"), goodbyes, confirmations, errors and more. Other skill replies get a friend's opener ("Okay, ..." becomes "Chal, ...", "Done." becomes "Ho gaya!"). The AI chat and web answers get the same style in their instructions.
+- Tell it how you feel ("I'm tired", "bore ho rahi hoon", "I'm stressed", "I'm so happy") and it answers like a friend: short and caring, maybe a break, music or a joke. After 1 am it sometimes (not every time, at most every 45 minutes) suggests sleeping.
+- Hindi verbs about itself follow the voice: a female voice says "dekhti hoon", a male one "dekhta hoon".
+
+**Natural voice.** `TTS_ENGINE=edge` uses [edge-tts](https://github.com/rany2/edge-tts) (Microsoft's free neural voices) and plays the audio with pygame's mixer. Each sentence starts downloading as soon as it's queued, so the next sentence is ready when the current one ends. The common short phrases are cached as mp3 in `data\tts_cache\` (filled in the background at startup) and play instantly. If you're offline or edge-tts fails, that sentence and the next minute's are spoken by the Windows voice (pyttsx3) instead. Ctrl+Alt+J still cuts it off mid-sentence.
+
+Measured on this laptop: an uncached sentence starts playing about 1.1 to 1.3 s after it's ready (edge-tts sends its first audio after 1.1 to 1.8 s, so streaming inside a sentence wouldn't gain much); cached phrases start in 0.02 to 0.12 s. Importing edge-tts takes about 8 s here, so it loads in the background: Jarvis starts in about a second with the Windows voice and switches to the neural voice when it's ready. For the default voice, `hi-IN-SwaraNeural` and `en-IN-NeerjaNeural` were compared on Hinglish lines by synthesising them and running Google speech recognition on the result: Swara came back slightly more accurate on mixed sentences (73% of words against 67%), equal on English, and it also reads Devanagari. Set `TTS_VOICE=en-IN-NeerjaNeural` if you prefer Neerja's sound.
 
 ## What you can say
 
@@ -255,11 +269,13 @@ Reminders only fire while Jarvis is running.
 
 **Everything else**
 - "What time is it", "what's the date", "who are you", "how are you", "thank you"
+- "I'm tired" / "I'm bored" / "bore ho rahi hoon" / "I'm stressed" (a friend's reply)
+- "Talk professionally" / "formal mode", "be my friend again" / "friend mode"
 - "What is 25 times 4", "10 percent of 250", "square root of 144", "2 to the power of 10"
 - "Tell me a joke"
 - "Who is Sachin Tendulkar", "tell me about the Taj Mahal", "what is Python" (Wikipedia)
 - Anything else goes to the AI (needs `AI_API_KEY`). "Forget our conversation" clears its memory.
-- Speak Hindi or Hinglish to the AI and it replies in Hinglish written in Roman letters, which the Windows voice can read.
+- Speak Hindi or Hinglish to the AI and it replies in Hinglish written in Roman letters, which every voice can read.
 - "Switch to Hindi" makes speech recognition listen for Hindi (`hi-IN`), and "switch to English" switches back. This lasts for the session only. In Hindi mode Google writes what you say in Devanagari, and `jarvis/translit.py` rewrites commands into English before routing: "क्रोम खोलो" becomes "open chrome". Messages and notes keep your exact words, and anything that isn't a command goes to the AI unchanged. See the Hindi section of [COMMANDS.md](COMMANDS.md).
 
 ## Architecture
@@ -278,6 +294,8 @@ jarvis/startup.py       Startup-folder shortcut logic
 jarvis/instance.py      single instance (named mutex) + "wake the running copy" signal
 jarvis/logs.py          rotating log file + console
 jarvis/voice.py         Voice: interruptible TTS on a worker thread, listening (wake word -> record -> STT), text mode
+jarvis/tts.py           neural voice: edge-tts synthesis + mp3 cache (data/tts_cache), pygame playback
+jarvis/persona.py       friend / professional personality: reply variants, AI style, feelings, late-night nudge
 jarvis/audio.py         always-open 16 kHz mic stream, webrtcvad end-of-speech, openWakeWord "hey jarvis"
 jarvis/stt.py           speech-to-text engines: Google, or faster-whisper loaded in the background
 jarvis/timing.py        per-turn latency log (--timing)

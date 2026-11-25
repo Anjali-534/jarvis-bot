@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import config
-from jarvis import http
+from jarvis import http, persona
 from jarvis.router import fallback, on_startup, skill
 
 log = logging.getLogger(__name__)
@@ -27,7 +27,9 @@ def system_prompt():
         "Language: if the user writes in Hindi or Hinglish (in Devanagari or Roman letters), reply in Hinglish "
         "written ONLY in Roman (English) letters, for example 'Haan bilkul, aap mujhse Hindi mein baat kar sakte hain.' "
         "Never use Devanagari script, because the text-to-speech voice cannot read it. "
-        "Otherwise reply in English."
+        "Otherwise reply in English" + (", sprinkled with a little Hinglish the way Delhi friends talk. "
+                                        if persona.is_friend() else ". ")
+        + persona.ai_style()
     )
 
 

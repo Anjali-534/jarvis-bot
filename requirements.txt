@@ -21,3 +21,5 @@ faster-whisper
 ddgs
 trafilatura
 tavily-python
+edge-tts
+pygame

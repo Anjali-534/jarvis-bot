@@ -5,7 +5,7 @@ import threading
 from datetime import datetime, timedelta
 
 import config
-from jarvis import notify
+from jarvis import notify, persona
 from jarvis.router import skill, speak_list
 from jarvis.timeparse import (
     clock_parts, find_clock, find_datetime, find_day, find_duration, remove_spans, say_clock, say_day, say_duration,
@@ -38,7 +38,7 @@ def clear_notes(ctx, command, match):
     if not notes:
         return "You don't have any notes to clear."
     count = f"{len(notes)} note{'s' if len(notes) != 1 else ''}"
-    if not ctx.confirm(f"Are you sure you want to delete all {count}?"):
+    if not ctx.confirm(persona.line("confirm_clear_notes", count=count)):
         return "Okay, I've kept your notes."
     config.NOTES_FILE.write_text("", encoding="utf-8")
     return f"Done. I deleted {count}."
@@ -63,9 +63,9 @@ def take_note(ctx, command, match):
     if not text:
         text = ctx.ask("What should I note down?").strip(" .")
         if not text:
-            return "Okay, never mind."
+            return persona.line("never_mind")
     add_note(text)
-    return f"Noted: {text}."
+    return persona.line("noted", text=text)
 
 
 # ---------------------------------------------------------------- reminders and timers
@@ -90,10 +90,10 @@ def schedule(ctx, delay_seconds, message, kind="reminder"):
             _reminders(ctx).remove(entry)
         if kind == "timer":
             notify.toast("Timer done", f"Your {message} timer is done.")
-            ctx.say(f"Time's up, {config.USER_NAME}! Your {message} timer is done.", wait=False)
+            ctx.say(persona.line("timer_done", message=message), wait=False)
         else:
             notify.toast("Reminder", message)  # visible even while muted or in a meeting
-            ctx.say(f"Reminder, {config.USER_NAME}: {message}", wait=False)
+            ctx.say(persona.line("reminder", message=message), wait=False)
 
     timer = threading.Timer(delay_seconds, fire)
     timer.daemon = True
@@ -166,7 +166,7 @@ def timer_skill(ctx, command, match):
             return "Sorry, I didn't get the duration. Try: set a timer for 5 minutes."
     seconds = seconds[0]
     schedule(ctx, seconds, say_duration(seconds), kind="timer")
-    return f"Timer set for {say_duration(seconds)}."
+    return persona.line("timer_set", duration=say_duration(seconds))
 
 
 @skill("reminder", r"\bremind me\b(.*)$", r"\bset (?:a\s+)?reminder\b(.*)$", category='notes', help=['remind me in 10 minutes to drink water', 'remind me at 6 pm to call mom'], params={"when": "when, e.g. 'in 10 minutes', 'at 6 pm', 'tomorrow at 9 am'", "message": "what to remind about, in English"}, command="remind me {when} to {message}")
@@ -184,6 +184,6 @@ def reminder_skill(ctx, command, match):
     if not message:
         message = clean_message(ctx.ask("What should I remind you about?"))
         if not message:
-            return "Okay, never mind."
+            return persona.line("never_mind")
     schedule(ctx, seconds, message)
-    return f"Okay, I'll remind you {when}: {message}."
+    return persona.line("reminder_set", when=when, message=message)

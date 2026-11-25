@@ -14,7 +14,7 @@ import logging
 import re
 
 import config
-from jarvis import http
+from jarvis import http, persona
 
 log = logging.getLogger(__name__)
 
@@ -325,8 +325,8 @@ def resolve(ctx, command):
     from jarvis import router
 
     if (sk.risky or target.risky) and not (target.confirms):
-        if not ctx.confirm(f"Just to check: {phrase}. Shall I go ahead?"):
-            ctx.say("Okay, I didn't do it.")
+        if not ctx.confirm(persona.line("confirm_action", action=phrase)):
+            ctx.say(persona.line("not_done"))
             return target.name
     result = router._run(ctx, target, phrase, match)
     if result is None:
