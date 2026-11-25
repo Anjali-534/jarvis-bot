@@ -35,6 +35,11 @@ WEBSITES = {
     "stack overflow": "https://stackoverflow.com", "stackoverflow": "https://stackoverflow.com",
     "amazon": "https://www.amazon.in", "flipkart": "https://www.flipkart.com",
     "whatsapp web": "https://web.whatsapp.com", "railway": "https://railway.app", "vercel": "https://vercel.com",
+    # for "can't do it, shall I open ... instead?" (food, cabs, shopping, tickets)
+    "swiggy": "https://www.swiggy.com", "zomato": "https://www.zomato.com", "blinkit": "https://blinkit.com",
+    "zepto": "https://www.zeptonow.com", "uber": "https://m.uber.com", "ola": "https://book.olacabs.com",
+    "rapido": "https://www.rapido.bike", "bookmyshow": "https://in.bookmyshow.com", "irctc": "https://www.irctc.co.in",
+    "makemytrip": "https://www.makemytrip.com", "myntra": "https://www.myntra.com", "netflix": "https://www.netflix.com",
 }
 
 # Spoken name -> process image name for taskkill

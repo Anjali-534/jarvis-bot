@@ -23,7 +23,8 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 | `WAQI_TOKEN` | A free token from <https://aqicn.org/data-platform/token/>. Red zones then come from real CPCB monitoring stations. |
 | `DEFAULT_LOCATION` | Used until you tell Jarvis your area. Defaults to New Delhi. |
 | `PERSONALITY`, `NICKNAME` | `friend` (default: talks like a close Delhi friend, in casual Hinglish) or `professional`, and what Jarvis calls you. See [Personality and voice](#personality-and-voice). |
-| `TTS_ENGINE`, `TTS_VOICE`, `TTS_RATE` | `edge` (default: Microsoft's free neural voices, needs internet) or `pyttsx3` (offline Windows voice); the neural voice (default `hi-IN-SwaraNeural`) and its speed. |
+| `TTS_ENGINE`, `TTS_VOICE`, `TTS_RATE` | `edge` (default: Microsoft's free neural voices, needs internet) or `pyttsx3` (offline Windows voice); the neural voice (default `en-IN-PrabhatNeural`, male) and its speed. |
+| `USER_GENDER` | `female` (default) or `male`: the Hindi verb forms Jarvis uses for you ("tu kaisi hai?" / "tu kaisa hai?"). |
 | `VOICE_NAME`, `VOICE_RATE` | The offline fallback voice: part of a Windows voice name (`zira`, `david`, `heera`...) and its speed. |
 | `WAKE_WORDS`, `FOLLOW_UP_SECONDS` | The wake phrases, and how long you can keep talking without one after a reply. |
 | `WHATSAPP_SEND_DELAY` | Seconds to wait for WhatsApp to open a chat before pressing Enter (default 3). |
@@ -146,11 +147,22 @@ Spotify only allows apps to control playback on **Premium** accounts. Without a 
 
 - Fixed replies live in `jarvis/persona.py`, with 3 to 5 variants each per personality (picked at random, never the same one twice in a row): greetings by time of day ("Good morning Anjali! Chai pi li?"), done ("Ho gaya!", "Lo, kar diya"), didn't catch ("Kya bola? Phir se bol na"), reminders ("Oye Anjali! Yaad hai na, pani peena hai"), AQI ("Bahar mat ja yaar, AQI 312 hai. Mask pehen ke hi nikalna"), goodbyes, confirmations, errors and more. Other skill replies get a friend's opener ("Okay, ..." becomes "Chal, ...", "Done." becomes "Ho gaya!"). The AI chat and web answers get the same style in their instructions.
 - Tell it how you feel ("I'm tired", "bore ho rahi hoon", "I'm stressed", "I'm so happy") and it answers like a friend: short and caring, maybe a break, music or a joke. After 1 am it sometimes (not every time, at most every 45 minutes) suggests sleeping.
-- Hindi verbs about itself follow the voice: a female voice says "dekhti hoon", a male one "dekhta hoon".
+- Hindi grammar follows both genders. Jarvis's own verbs follow the voice (male by default: "main kar dunga", "aa gaya", "samajh gaya"), and the way it talks to you follows `USER_GENDER` ("tu kaisi hai?", "thak gayi kya?", "aa gayi!"). Phrases in `persona.py` never hard-code a gendered verb (placeholders `{ta}`/`{ga}`/`{a}` for Jarvis, `{u_a}`/`{u_ta}` for you), and a test scans every variant for wrong forms.
+
+**It answers everything.** Anything that isn't a command goes to the AI, which picks one of five things, so there are no dead ends:
+1. An action a skill does: it runs it.
+2. Current or real-world facts (news, prices, people, places, "is X still...", anything after the model's training data): a web search, answered from the sources.
+3. Knowledge, explanations, advice, opinions, maths, coding, life questions, jokes, chat: a friendly answer, 1 to 3 sentences, longer when you say "explain karo" / "detail mein bata". Opinions come with reasons; health, money and legal answers end with a short "doctor/CA se confirm kar lena" when it matters.
+4. Something it can't do yet ("order me a pizza"): it says so casually and offers the closest thing it can do ("main Swiggy khol sakta hoon?"). Say "haan" and it does it. Only harmless alternatives (open a site or app, search, play music) are offered this way.
+5. Too unclear: ONE short question, like a friend ("Kaunsa match? India wala?").
+
+It answers in your language (English, Hinglish, or Hinglish in Roman letters when you speak Hindi), says "Pakka nahi pata yaar" instead of guessing, and never makes up facts. "Aur?", "kyun?", "uska kya?" go straight to the chat AI, which remembers the last 10 exchanges (separate from the 3 turns sent for picking actions); after a web answer, "aur?" reads more from the same pages. If the AI is down or rate-limited, the Gemini backup is tried once, and if that fails too Jarvis says so in friend style ("Net thoda slow hai yaar, ek minute mein try karte hain"). With no AI key at all, it looks the question up on the web instead.
+
+Groq's free tier allows 7,000 input tokens a minute, and each routed question sends about 2,300 (mostly the list of actions), so several questions in quick succession make it switch to the Gemini backup for a while ("Backup brain on!").
 
 **Natural voice.** `TTS_ENGINE=edge` uses [edge-tts](https://github.com/rany2/edge-tts) (Microsoft's free neural voices) and plays the audio with pygame's mixer. Each sentence starts downloading as soon as it's queued, so the next sentence is ready when the current one ends. The common short phrases are cached as mp3 in `data\tts_cache\` (filled in the background at startup) and play instantly. If you're offline or edge-tts fails, that sentence and the next minute's are spoken by the Windows voice (pyttsx3) instead. Ctrl+Alt+J still cuts it off mid-sentence.
 
-Measured on this laptop: an uncached sentence starts playing about 1.1 to 1.3 s after it's ready (edge-tts sends its first audio after 1.1 to 1.8 s, so streaming inside a sentence wouldn't gain much); cached phrases start in 0.02 to 0.12 s. Importing edge-tts takes about 8 s here, so it loads in the background: Jarvis starts in about a second with the Windows voice and switches to the neural voice when it's ready. For the default voice, `hi-IN-SwaraNeural` and `en-IN-NeerjaNeural` were compared on Hinglish lines by synthesising them and running Google speech recognition on the result: Swara came back slightly more accurate on mixed sentences (73% of words against 67%), equal on English, and it also reads Devanagari. Set `TTS_VOICE=en-IN-NeerjaNeural` if you prefer Neerja's sound.
+Measured on this laptop: an uncached sentence starts playing about 1.1 to 1.3 s after it's ready (edge-tts sends its first audio after 1.1 to 1.8 s, so streaming inside a sentence wouldn't gain much); cached phrases start in 0.02 to 0.12 s. Importing edge-tts takes about 8 s here, so it loads in the background: Jarvis starts in about a second with the Windows voice and switches to the neural voice when it's ready. Choosing the voice: candidates were compared by synthesising 10 Hinglish and 5 English lines, running Google speech recognition on the audio, and comparing the words. Of the male voices, `en-IN-PrabhatNeural` came back clearest (80% of words on average) and produced audio for every line, while `hi-IN-MadhurNeural` failed to produce any audio for 3 of the 15 lines ("No audio was received", even on retry). Prabhat is the default. Female options: `hi-IN-SwaraNeural` (73% on mixed Hinglish in an earlier run) and `en-IN-NeerjaNeural` (67%); set one in `TTS_VOICE` and Jarvis's own verbs switch to the female forms. Keep `VOICE_NAME` (the offline fallback) the same gender: `david` or `zira`.
 
 ## What you can say
 
@@ -274,7 +286,7 @@ Reminders only fire while Jarvis is running.
 - "What is 25 times 4", "10 percent of 250", "square root of 144", "2 to the power of 10"
 - "Tell me a joke"
 - "Who is Sachin Tendulkar", "tell me about the Taj Mahal", "what is Python" (Wikipedia)
-- Anything else goes to the AI (needs `AI_API_KEY`). "Forget our conversation" clears its memory.
+- Anything else goes to the AI (needs `AI_API_KEY`; without one, Jarvis searches the web): questions, advice, opinions ("tu kya sochta hai, mujhe MBA karna chahiye?"), explanations ("explain recursion simply"), and follow-ups ("aur?", "kyun?"). Things it can't do get an alternative ("order me a pizza" -> "Swiggy khol doon?"). "Forget our conversation" clears its memory.
 - Speak Hindi or Hinglish to the AI and it replies in Hinglish written in Roman letters, which every voice can read.
 - "Switch to Hindi" makes speech recognition listen for Hindi (`hi-IN`), and "switch to English" switches back. This lasts for the session only. In Hindi mode Google writes what you say in Devanagari, and `jarvis/translit.py` rewrites commands into English before routing: "क्रोम खोलो" becomes "open chrome". Messages and notes keep your exact words, and anything that isn't a command goes to the AI unchanged. See the Hindi section of [COMMANDS.md](COMMANDS.md).
 

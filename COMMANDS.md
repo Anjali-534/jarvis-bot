@@ -158,7 +158,10 @@ Jarvis talks like a close friend by default (casual Hinglish: "Ho gaya!", "Kya b
 - "What is 25 times 4" / "what is 10 percent of 250" / "what is the square root of 144"
 - "Who is Sachin Tendulkar" / "tell me about the Taj Mahal"
 - "Tell me a joke" / "who are you" / "how are you" / "thank you"
-- Anything else goes to the AI: "do you know Hindi", "write a 2 line poem about Delhi winters"
+- Anything else goes to the AI, which answers like a friend: "tu kaisa hai", "mujhe neend nahi aa rahi", "explain recursion simply", "tu kya sochta hai, mujhe MBA karna chahiye?", "kaunsa better hai iPhone ya Pixel"
+- Follow-ups: "aur?", "kyun?", "uska kya?", "explain karo" / "detail mein bata" (a longer answer)
+- Things it can't do yet get an alternative: "order me a pizza" -> "Swiggy khol doon?", then "haan" opens it (or "nahi")
+- Unclear questions get one short question back ("Kaunsa match? India wala?")
 - "Forget our conversation" (clears the AI's memory)
 - "Which AI model are you using" (if a model is retired, Jarvis switches to a newer one by itself and tells you once; it also says whether the Gemini backup is in use)
 - **Hindi / Hinglish:** talk to the AI in Hinglish and it replies in Hinglish, written in English letters.

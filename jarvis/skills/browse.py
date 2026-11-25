@@ -565,7 +565,8 @@ def last_search(ctx, recent_only=True):
     return last
 
 
-@skill("tell me more", r"^(?:please\s+)?(?:tell me more|more details?|more info(?:rmation)?|explain more|go on|"
+@skill("tell me more", r"^(?:aur|and|phir|aur kuch|what else|anything else)\??$",
+       r"^(?:please\s+)?(?:tell me more|more details?|more info(?:rmation)?|explain more|go on|"
        r"elaborate|tell me more about (?:it|that|this)|aur batao|aur bataiye|thoda aur batao|detail (?:mein|me) batao)$",
        category="web", help=["tell me more (after a web search)"])
 def tell_me_more(ctx, command, match):

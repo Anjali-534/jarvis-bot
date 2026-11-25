@@ -6,8 +6,14 @@ English command ("remind me tomorrow at 9 am to go to the gym") that runs throug
 existing confirmations still apply. The AI can only reach registered skills: the canonical command must be
 handled by the tool's own skill (or the few listed in also=), and risky tools always ask first.
 
-If the AI answers instead of calling a tool, that answer is spoken directly (one AI call, not two).
-The last 3 turns are sent along so follow-ups work: "what about Noida?", "and tomorrow?".
+Anything that isn't a skill is never a dead end. The AI must call one tool:
+  a) current or real-world facts                 -> web_search (answered from the sources)
+  b) knowledge, advice, opinions, maths, chat    -> reply (spoken directly: one AI call, not two)
+  c) an action Jarvis can't do                   -> cant_do: says so casually and offers the closest thing it
+                                                    CAN do; "haan" runs it (only safe skills: open, search...)
+  d) too unclear to act on                       -> clarify: ONE short question, like a friend would ask
+The last 3 turns are sent along so follow-ups work: "what about Noida?", "and tomorrow?". Chat follow-ups
+("aur?", "kyun?") go straight to the chat AI with its own 10-turn memory (skills/ai.py).
 """
 import json
 import logging
@@ -25,18 +31,25 @@ TYPES = {"string": "string", "integer": "integer", "number": "number", "boolean"
 MAX_ARG = 200
 
 RULES = (
-    "If the user's message asks for something a tool does (volume, music, apps, reminders, timers, notes, weather, "
-    "air quality, WhatsApp, email, calendar, laptop power), call exactly ONE tool. Tool arguments are plain English: "
-    "translate Hindi/Hinglish ('kal subah 9 baje' = 'tomorrow at 9 am'). Reminder times: 'in 10 minutes', "
-    "'at 6 pm', 'tomorrow at 9 am'. Follow-ups ('what about Noida?', 'and tomorrow?', 'make it 5 minutes instead', "
-    "'send the same to Riya') reuse the previous turn's command with the changed argument. "
-    "NEVER state live data yourself (weather, temperature, air quality, news, calendar, email): always call the tool. "
+    "Call exactly ONE tool for every message. Never say you can't help without offering something.\n"
+    "1) Actions a tool does (volume, music, apps, reminders, timers, notes, weather, air quality, WhatsApp, email, "
+    "calendar, laptop power): call that tool. Tool arguments are plain English: translate Hindi/Hinglish ('kal subah "
+    "9 baje' = 'tomorrow at 9 am'). Reminder times: 'in 10 minutes', 'at 6 pm', 'tomorrow at 9 am'. Follow-ups "
+    "('what about Noida?', 'and tomorrow?', 'make it 5 minutes instead', 'send the same to Riya') reuse the previous "
+    "turn's command with the changed argument. Music: leave platform out unless the user names Spotify. Keep the "
+    "user's own words for message texts.\n"
+    "2) NEVER state live data yourself (weather, temperature, air quality, news, calendar, email): call the tool. "
     "Use web_search for current events, prices, scores, match results, 'latest' or 'today' questions, who holds a "
-    "role now, and anything after your training data; not for maths, jokes, chat or settled facts. "
-    "Don't ask which app to use for music: leave platform out unless the user names Spotify. Keep the user's own "
-    "words for message texts. "
-    "Otherwise (chat, questions, facts) call the reply tool with 1 or 2 short spoken sentences, no "
-    "markdown; if they wrote Hindi or Hinglish, reply in Hinglish using only Roman letters."
+    "role now, people, places, products and events whose facts may have changed, 'is X still...', and anything "
+    "after your training data; not for maths, jokes, chat, advice or settled facts.\n"
+    "3) General knowledge, explanations, advice, opinions, maths, coding, life questions, jokes and chat: call "
+    "reply with your spoken answer (plain speech, no markdown).\n"
+    "4) An action no tool does (order food, book a cab, pay a bill, make a phone call...): call cant_do: say "
+    "casually that you can't do it yet and offer the closest thing you CAN do, given as alternative (a command like "
+    "'open swiggy', 'search the web for pizza places near me', 'show me pizza delivery on google', 'play lofi').\n"
+    "5) Too unclear to act on or answer ('who won the match?' with no hint which): call clarify with ONE short "
+    "question, the way a friend would ask ('Kaunsa match? India wala?'). Don't over-ask: if a sensible guess "
+    "exists, act on it."
 )
 
 
@@ -93,18 +106,39 @@ REPLY_TOOL = "reply"
 REPLY_SCHEMA = {"type": "object", "properties": {"text": {
     "type": "string", "description": "your short spoken answer, for chat, questions and facts (never live data)"}},
     "required": ["text"]}
+CANT_DO_TOOL = "cant_do"
+CANT_DO_SCHEMA = {"type": "object", "properties": {
+    "text": {"type": "string", "description": "casually say you can't do that yet and offer the alternative, "
+                                              "ending with a short question"},
+    "alternative": {"type": "string", "description": "a command you CAN run instead, e.g. 'open swiggy', "
+                                                     "'search the web for ...', 'show me ... on google'"}},
+    "required": ["text", "alternative"]}
+CLARIFY_TOOL = "clarify"
+CLARIFY_SCHEMA = {"type": "object", "properties": {"question": {
+    "type": "string", "description": "ONE short clarifying question, like a friend would ask"}}, "required": ["question"]}
+EXTRA_TOOLS = [
+    (REPLY_TOOL, "answer the user without doing anything", REPLY_SCHEMA),
+    (CANT_DO_TOOL, "an action you have no tool for: say so and offer the closest thing you can do", CANT_DO_SCHEMA),
+    (CLARIFY_TOOL, "ask one short question when the request is too unclear", CLARIFY_SCHEMA),
+]
 
 
 def openai_tools():
     skills = [{"type": "function", "function": {"name": n, "description": d, "parameters": s}} for n, d, s, _ in tools()]
-    return skills + [{"type": "function", "function": {
-        "name": REPLY_TOOL, "description": "answer the user without doing anything", "parameters": REPLY_SCHEMA}}]
+    return skills + [{"type": "function", "function": {"name": n, "description": d, "parameters": s}}
+                     for n, d, s in EXTRA_TOOLS]
 
 
 def _decision(name, args):
+    args = args if isinstance(args, dict) else {}
     if name == REPLY_TOOL:
-        text = str((args or {}).get("text", "")).strip()
+        text = str(args.get("text", "")).strip()
         return ("text", text) if text else None
+    if name == CANT_DO_TOOL:
+        return ("offer", str(args.get("text", "")).strip(), str(args.get("alternative", "")).strip())
+    if name == CLARIFY_TOOL:
+        question = str(args.get("question", "")).strip()
+        return ("clarify", question) if question else None
     return ("tool", name, args if isinstance(args, dict) else {})
 
 
@@ -124,8 +158,8 @@ def gemini_tools():
         if params["properties"]:
             decl["parameters"] = _gemini_schema(params)
         declarations.append(decl)
-    declarations.append({"name": REPLY_TOOL, "description": "answer the user without doing anything",
-                         "parameters": _gemini_schema(REPLY_SCHEMA)})
+    for name, desc, params in EXTRA_TOOLS:
+        declarations.append({"name": name, "description": desc, "parameters": _gemini_schema(params)})
     return [{"functionDeclarations": declarations}]
 
 
@@ -191,7 +225,7 @@ def _context(ctx):
     copies old answers and invents live data ("the AQI in Gurgaon is 291") instead of calling the tool."""
     lines = []
     for turn in ctx.state.get("turns", [])[-3:]:
-        if turn["skill"] == "ai":
+        if turn["skill"] in CHAT_SKILLS:
             lines.append(f"User: {turn['you']}")
             if turn.get("jarvis"):
                 lines.append(f"You replied: {turn['jarvis'][:120]}")
@@ -200,14 +234,18 @@ def _context(ctx):
     return "\n".join(lines)
 
 
+CHAT_SKILLS = {"ai", "chat follow-up", "offer"}
+
+
 def system_text(ctx):
     """A short prompt on purpose: it's sent with the tool list on every routed command."""
     from datetime import datetime
 
     recent = _context(ctx)
-    persona = (f"You are {config.ASSISTANT_NAME}, the voice assistant on {config.USER_NAME}'s Windows laptop in India. "
-               f"Now: {datetime.now():%A %d %B %Y, %I:%M %p}. ")
-    return persona + RULES + (f"\n\nRecent conversation:\n{recent}" if recent else "")
+    me = (f"You are {config.ASSISTANT_NAME}, the voice assistant on {config.USER_NAME}'s Windows laptop in India. "
+          f"Now: {datetime.now():%A %d %B %Y, %I:%M %p}. ")
+    return (me + RULES + "\nHow you talk in reply, cant_do and clarify: " + persona.ai_style(brief=True)
+            + (f"\n\nRecent conversation:\n{recent}" if recent else ""))
 
 
 def router_model():
@@ -305,8 +343,10 @@ def resolve(ctx, command):
     decision = decide(ctx, command)
     if decision is None:
         return None
-    if decision[0] == "text":
+    if decision[0] in ("text", "clarify"):
         return _answer(ctx, command, decision[1])
+    if decision[0] == "offer":
+        return _offer(ctx, command, decision[1], decision[2])
     _, name, args = decision
     sk = next((t[3] for t in tools() if t[0] == name), None)
     if sk is None:
@@ -332,6 +372,36 @@ def resolve(ctx, command):
     if result is None:
         return None
     return router._deliver(ctx, target, result)
+
+
+# Alternatives the AI may offer for "can't do": only harmless skills (open a site or app, search, play music).
+SAFE_ALTERNATIVES = {"open", "web search", "web question", "google in browser", "youtube search", "play youtube",
+                     "spotify play", "news", "search more"}
+
+
+def safe_alternative(command):
+    """The command if a harmless skill would run it, else None."""
+    from jarvis import router
+
+    command = re.sub(r"\s+", " ", (command or "").strip().lower()).strip(" .?!")
+    if not command:
+        return None
+    for sk in router.SKILLS:
+        if any(p.search(command) for p in sk.patterns):
+            return command if sk.name in SAFE_ALTERNATIVES else None
+    return None
+
+
+def _offer(ctx, command, text, alternative):
+    """c) Can't do it: say so casually, offer the closest thing; "haan" runs it (router.handle)."""
+    alternative = safe_alternative(alternative)
+    if not text:
+        text = persona.line("cant_do", alternative=alternative or "Google pe dhoondh")
+    handled = _answer(ctx, command, text)
+    if alternative:
+        ctx.state["offer"] = alternative
+        log.info("(offered: %s)", alternative)
+    return "offer" if handled else None
 
 
 def _answer(ctx, command, text):

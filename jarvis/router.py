@@ -101,6 +101,9 @@ HINDI_YES = {"हां", "हा", "जी", "जी हां", "हां ज
 HINDI_NO = {"नहीं", "नही", "ना", "मत", "रहने दो", "मत करो", "मत भेजो", "नहीं करना"}
 
 
+NO = re.compile(r"^(?:no|nope|nah|nahi|nahin|na|mat|rehne do|chhodo|chodo|no thanks|nahi chahiye)\b")
+
+
 def is_yes(answer: str) -> bool:
     from jarvis import translit
 
@@ -271,6 +274,14 @@ def handle(ctx, command):
                 return handled
     ctx.state.pop("last_said", None)
     ctx.state.pop("understood", None)
+    offer = ctx.state.pop("offer", None)  # "can't order pizza, Google pe dhoondh doon?" -> "haan"
+    if offer and is_yes(command):
+        log.info(f"(offer accepted: {offer})")
+        return handle(ctx, offer)
+    if offer and NO.search(command):
+        ctx.say(persona.line("never_mind"))
+        remember_turn(ctx, command, "offer")
+        return "offer"
     handled = _try_skills(ctx, command)
     if not handled and FALLBACK is not None:
         from jarvis import intent

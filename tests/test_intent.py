@@ -197,7 +197,7 @@ def test_reply_tool_is_plain_chat(ai_router):
     assert handle(ctx, "tum kaise ho yaar") == "ai"
     assert ctx.voice.said == ["Main bilkul theek hoon.", "Aap batao, kya haal hai?"]
     names = [t["function"]["name"] for t in ai_router.requests[0]["payload"]["tools"]]
-    assert names[-1] == "reply"
+    assert names[-3:] == ["reply", "cant_do", "clarify"]
 
 
 # ---------------------------------------------------------------- follow-ups

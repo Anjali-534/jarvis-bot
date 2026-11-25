@@ -41,17 +41,18 @@ USER_NAME = _str("USER_NAME", "Anjali")
 # friend = casual Delhi Hinglish, warm and a bit witty; professional = the polite assistant
 PERSONALITY = _str("PERSONALITY", "friend").lower()
 NICKNAME = _str("NICKNAME", USER_NAME)  # what Jarvis calls you in friend mode
+USER_GENDER = _str("USER_GENDER", "female").lower()  # Hindi verb forms when Jarvis talks to you (aa gayi / aa gaya)
 
 WAKE_WORD_ENABLED = _bool("WAKE_WORD_ENABLED", True)
 WAKE_WORDS = [w.strip().lower() for w in _str("WAKE_WORDS", "jarvis,hey jarvis,ok jarvis").split(",") if w.strip()]
 FOLLOW_UP_SECONDS = _int("FOLLOW_UP_SECONDS", 20)
 
 SPEECH_LANGUAGE = _str("SPEECH_LANGUAGE", "en-IN")
-VOICE_NAME = _str("VOICE_NAME", "zira")   # pyttsx3 (Windows) voice: the offline fallback
+VOICE_NAME = _str("VOICE_NAME", "david")   # pyttsx3 (Windows) voice: the offline fallback
 VOICE_RATE = _int("VOICE_RATE", 185)
 # edge = Microsoft's free neural voices via edge-tts (needs internet; falls back to pyttsx3); pyttsx3 = offline only
 TTS_ENGINE = _str("TTS_ENGINE", "edge").lower()
-TTS_VOICE = _str("TTS_VOICE", "hi-IN-SwaraNeural")  # best on mixed Hinglish in tests; reads Devanagari too
+TTS_VOICE = _str("TTS_VOICE", "en-IN-PrabhatNeural")  # male; clearest male voice in the Hinglish tests
 TTS_RATE = _str("TTS_RATE", "+5%")                 # edge-tts speaking rate, e.g. -10%, +0%, +15%
 TTS_TIMEOUT = float(_str("TTS_TIMEOUT", "4"))      # seconds to wait for edge-tts before using pyttsx3
 

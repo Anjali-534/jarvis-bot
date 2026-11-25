@@ -14,22 +14,20 @@ from jarvis.router import fallback, on_startup, skill
 
 log = logging.getLogger(__name__)
 
-MAX_TURNS = 8
+MAX_TURNS = 10  # chat memory, separate from the routing context (3 turns)
 
 
 def system_prompt():
+    length = ("" if persona.is_friend() else
+              "Answer in 1 or 2 short sentences of plain speech, unless the user asks you to explain in detail. ")
     return (
-        f"You are {config.ASSISTANT_NAME}, a friendly voice assistant for {config.USER_NAME}, who lives in India. "
-        f"The current date and time is {datetime.now():%A %d %B %Y, %I:%M %p}. "
-        "Your replies are spoken aloud, so answer in 1 or 2 short sentences of plain speech, unless the user asks "
-        "you to explain in detail. "
-        "Never use markdown, bullet points, code blocks, emojis or URLs. "
-        "Language: if the user writes in Hindi or Hinglish (in Devanagari or Roman letters), reply in Hinglish "
-        "written ONLY in Roman (English) letters, for example 'Haan bilkul, aap mujhse Hindi mein baat kar sakte hain.' "
-        "Never use Devanagari script, because the text-to-speech voice cannot read it. "
-        "Otherwise reply in English" + (", sprinkled with a little Hinglish the way Delhi friends talk. "
-                                        if persona.is_friend() else ". ")
-        + persona.ai_style()
+        f"You are {config.ASSISTANT_NAME}, {persona.nickname()}'s voice assistant; {persona.nickname()} lives in "
+        f"India. The current date and time is {datetime.now():%A %d %B %Y, %I:%M %p}. "
+        "Your replies are spoken aloud: plain speech, never markdown, bullet points, code blocks, emojis or URLs. "
+        + length + persona.ai_style() +
+        "Follow-ups like 'aur?', 'kyun?', 'uska kya?' refer to the conversation so far. "
+        "You can't browse here: for live facts (prices, news, scores) say you'd have to check online rather than "
+        "guess."
     )
 
 
@@ -37,7 +35,7 @@ KEY_WORDS = ("api key", "auth key", "api_key_invalid", "access_token_type_unsupp
 
 
 def error_message(status, body=""):
-    """A clear spoken message for an HTTP error from the AI service."""
+    """A clear spoken message for an HTTP error from the AI service (in the current personality)."""
     body = (body or "").lower()
     if status in (401, 403) or (status == 400 and any(w in body for w in KEY_WORDS)):
         return "My AI key was rejected. Please check AI_API_KEY in your .env file."
@@ -45,10 +43,9 @@ def error_message(status, body=""):
         return (f"The AI model {config.AI_MODEL} wasn't found. "
                 "Please check AI_MODEL and AI_BASE_URL in your .env file.")
     if status == 429:
-        return ("I've used up the free AI quota or hit the rate limit. Try again in a minute, "
-                "or tomorrow if the daily limit is used up.")
+        return persona.line("ai_busy")
     if status >= 500:
-        return "The AI service is having problems right now. Please try again in a bit."
+        return persona.line("ai_trouble")
     return f"The AI service returned an error, code {status}."
 
 
@@ -141,7 +138,8 @@ def list_gemini_models():
 SHORT_TOKENS = 150
 DETAIL_TOKENS = 600
 _DETAIL = re.compile(r"\b(?:in detail|in depth|detailed|step by step|explain (?:it )?(?:fully|properly|everything)|"
-                     r"vistaar se|detail mein|detail me)\b")
+                     r"vistaar se|detail mein|detail me|explain karo|explain kar|samjhao|samjha do|elaborate|"
+                     r"tell me more|aur detail)\b")
 
 
 def max_tokens_for(command):
@@ -552,19 +550,45 @@ def announce_switch(ctx):
     global _switch_pending, _backup_pending
     if _backup_pending:
         _backup_pending = False
-        ctx.say(BACKUP_SWITCH, wait=False)
+        ctx.say(persona.line("backup_switch"), wait=False)
     if _switch_pending:
         _switch_pending = False
         ctx.say(SWITCHED, wait=False)
 
 
+# Chat follow-ups go straight to the chat AI (with its 10-turn memory), skipping the routing call
+_FOLLOW_UP = (r"^(?:aur|aur\?|aur batao|aur bata|aur bataiye|aur kuch|phir|phir kya|then|and then|and|and\?|kyun|kyu|"
+              r"kyon|why|why not|how|kaise|how come|uska kya|uske baare mein|uske bare me|us ka kya|matlab|means|"
+              r"really|sach mein|sach me|seriously|accha|achha|okay and|ok and|go on|continue)\??$",
+              r"^(?:explain karo|explain kar|detail mein bata\w*|detail me bata\w*|samjhao|samjha do|elaborate|"
+              r"explain (?:it |that )?(?:in detail|more)|tell me more|aur detail mein)\??$")
+
+
+@skill("chat follow-up", *_FOLLOW_UP, category="general", help=["aur?", "kyun?", "detail mein bata"])
+def chat_follow_up(ctx, command, match):
+    """"aur?", "kyun?", "detail mein bata" right after a chat answer: the chat AI, which remembers 10 turns."""
+    turns = ctx.state.get("turns") or []
+    if not ctx.state.get("ai_history") or not turns or turns[-1]["skill"] not in ("ai", "chat follow-up", "offer"):
+        return None  # nothing to follow up on: routing decides
+    return ai(ctx, command)
+
+
+def _no_ai_key(ctx, command):
+    """No AI key: still not a dead end. Look it up on the web (read out from the search results)."""
+    from jarvis.skills import browse
+
+    answer = browse.look_up(ctx, command, question=command)
+    if answer and persona.is_line("nothing_found", answer):
+        answer += " Add an AI_API_KEY to the .env file and I can answer anything."
+    return answer
+
+
 @fallback
 def ai(ctx, command, match=None):
     if not config.AI_API_KEY:
-        return ("I don't know how to answer that yet. "
-                "To let me answer anything, add an AI_API_KEY to the .env file.")
+        return _no_ai_key(ctx, command)
     if ctx.state.pop("ai_down", None) == command:
-        return BOTH_DOWN  # the AI router just tried both for this command: don't make the user wait twice
+        return persona.line("ai_down")  # the AI router just tried both for this command: don't make the user wait
     history = ctx.state.setdefault("ai_history", [])
     spoken = []
     try:
@@ -585,7 +609,7 @@ def ai(ctx, command, match=None):
             ctx.say(text, wait=False)  # speak this sentence while the next one is still being generated
             spoken.append(text)
     except BothFailed:
-        return BOTH_DOWN
+        return persona.line("ai_down")
     except Blocked as exc:
         log.info("[ai] response blocked: %s", exc)
         if not spoken:
@@ -598,7 +622,7 @@ def ai(ctx, command, match=None):
     if wait:
         wait()  # finish speaking before listening again
     if not spoken:
-        return "I'm not sure what to say to that."
+        return persona.line("no_reply")
     reply = " ".join(spoken)
     history.extend([{"role": "user", "content": command}, {"role": "assistant", "content": reply}])
     del history[:-MAX_TURNS * 2]

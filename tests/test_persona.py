@@ -55,6 +55,7 @@ def test_every_phrase_renders_for_both_voice_genders(monkeypatch, tts_voice, wan
     monkeypatch.setattr(config, "TTS_VOICE", tts_voice)
     values = dict(name="Anjali", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
                   action="restart", delay="15 seconds", duration="5 minutes", text="t", count="2 notes", time="2",
+                  alternative="Google pe dhoondh doon",
                   **persona._verb_forms())
     rendered = " ".join(t.format(**values) for entry in persona.PHRASES.values() for options in entry.values()
                         for t in options)
@@ -91,7 +92,7 @@ def test_verb_forms_follow_the_voice(friend, monkeypatch):
     assert persona.line("checking_online") == "Ruk, online dekhti hoon"
     monkeypatch.setattr(config, "TTS_VOICE", "en-IN-PrabhatNeural")
     assert persona.line("checking_online") == "Ruk, online dekhta hoon"
-    assert "dekhta" in persona.ai_style()
+    assert "'main kar dunga', 'main aa gaya'" in persona.ai_style()
 
 
 def test_restyle_gives_other_replies_a_friends_opener(friend):
@@ -163,7 +164,7 @@ def test_the_ai_talks_like_a_friend_too(friend):
 
     prompt = ai.system_prompt()
     assert "close friend from Delhi" in prompt and "never make up facts" in prompt
-    assert "arre, yaar" in prompt and "female Hindi verb forms" in prompt
+    assert "arre, yaar" in prompt and "use male verb forms for yourself" in prompt
     persona.set_mode(persona.PROFESSIONAL)
     try:
         assert "professional" in ai.system_prompt() and "close friend" not in ai.system_prompt()

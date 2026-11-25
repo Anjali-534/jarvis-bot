@@ -8,9 +8,13 @@ Every phrase has 3-5 variants per personality, picked at random without saying t
 The professional ones start with Jarvis's original wording. "talk professionally" / "friend mode" switch for
 the session (set_mode); PERSONALITY and NICKNAME in .env set the default.
 
-Hindi verbs about Jarvis itself follow the voice: a female voice (the default, en-IN-NeerjaNeural) says
-"dekhti hoon", a male one "dekhta hoon". Placeholders: {ta} ta/ti, {ga} ga/gi, {a} a/i, {name} the nickname,
-{assistant} Jarvis's name.
+Hindi grammar follows both genders. Jarvis's verbs follow the voice (TTS_VOICE; a male voice says "main kar
+dunga", "aa gaya", a female one "kar dungi", "aa gayi"), and the user's follow USER_GENDER ("tu kaisi hai?",
+"thak gayi kya?" for female; "kaisa", "thak gaya" for male). Never write a gendered verb form literally in a
+phrase; use the placeholders:
+    Jarvis:   {ta} ta/ti (karta hoon)   {ga} ga/gi (dunga)   {a} a/i (gaya, raha)
+    the user: {u_a} a/i (gayi, rahi, kaisi)   {u_ta} ta/ti (sakti)
+    {name} the nickname, {assistant} Jarvis's name.
 """
 import random
 import re
@@ -23,27 +27,28 @@ _session_mode = None        # "talk professionally" / "friend mode" for this ses
 _last = {}                  # key -> the variant said last time, so it doesn't repeat
 choose = random.choice      # tests pin this to the first variant
 AVOID_REPEAT = True         # tests turn this off
-MALE_VOICES = ("prabhat", "madhur", "kunal", "rehaan", "aarav", "david", "mark", "ravi", "hemant", "guy", "davis")
+MALE_VOICES = ("prabhat", "madhur", "kunal", "rehaan", "aarav", "david", "mark", "ravi", "hemant", "guy", "davis",
+               "andrew", "brian", "christopher", "eric", "roger", "steffan", "ryan", "william", "liam", "connor")
 
 PHRASES = {
     # ---------------------------------------------------------------- greetings and the main loop
     "online_morning": {
         PROFESSIONAL: ["Good morning, {name}. {assistant} is online."],
         FRIEND: ["Good morning {name}! Chai pi li?", "Morning {name}! Aaj ka kya plan hai?",
-                 "Uth gayi? Good morning {name}!", "Good morning! Bata {name}, aaj kya karna hai?"],
+                 "Uth gay{u_a}? Good morning {name}!", "Good morning! Bata {name}, aaj kya karna hai?"],
     },
     "online_afternoon": {
         PROFESSIONAL: ["Good afternoon, {name}. {assistant} is online."],
-        FRIEND: ["Arre aa gayi! Bata kya scene hai", "Hey {name}! Lunch hua?", "Haan {name}, bol kya chal raha hai?"],
+        FRIEND: ["Arre aa gay{u_a}! Bata kya scene hai", "Hey {name}! Lunch hua?", "Haan {name}, bol kya chal raha hai?"],
     },
     "online_evening": {
         PROFESSIONAL: ["Good evening, {name}. {assistant} is online."],
-        FRIEND: ["Good evening {name}! Din kaisa raha?", "Arre aa gayi! Bata kya scene hai",
+        FRIEND: ["Good evening {name}! Din kaisa raha?", "Arre aa gay{u_a}! Bata kya scene hai",
                  "Hey {name}! Shaam ho gayi, chai time?"],
     },
     "online_night": {
         PROFESSIONAL: ["Good evening, {name}. {assistant} is online."],
-        FRIEND: ["Itni raat ko? Bata {name}, kya chahiye", "Arre, abhi tak jaag rahi ho? Bolo {name}",
+        FRIEND: ["Itni raat ko? Bata {name}, kya chahiye", "Arre, abhi tak jaag rah{u_a} hai? Bol {name}",
                  "Hey {name}! Late night mode on?"],
     },
     "hello": {
@@ -134,7 +139,7 @@ PHRASES = {
         PROFESSIONAL: ["I couldn't reach the online service right now. Please check your internet and try again."],
         FRIEND: ["Internet se connect nahi ho pa raha yaar. Wifi check kar le?",
                  "Net nahi chal raha lagta hai. Ek baar wifi dekh lo?",
-                 "Online service tak pahunch nahi paya. Internet theek hai na?"],
+                 "Online service se baat nahi ho pa rahi. Internet theek hai na?"],
     },
     # ---------------------------------------------------------------- notes, reminders, timers
     "noted": {
@@ -168,7 +173,8 @@ PHRASES = {
     "how_are_you": {
         PROFESSIONAL: ["I'm running smoothly, thanks for asking, {name}. How about you?",
                        "All systems online and feeling great. What can I do for you?"],
-        FRIEND: ["Ekdum mast! Tu bata?", "Badhiya yaar, tu suna?", "Main toh chill hoon. Tera kya haal?"],
+        FRIEND: ["Ekdum mast! Tu bata, tu kais{u_a} hai?", "Badhiya yaar, tu suna?", "Main toh chill hoon. Tera kya haal?",
+                 "Mast hoon! Tune khana kha liya?"],
     },
     "who_are_you": {
         PROFESSIONAL: ["I'm {assistant}, your personal voice assistant. I can check air quality and weather, open apps, "
@@ -191,12 +197,12 @@ PHRASES = {
     "feel_tired": {
         PROFESSIONAL: ["Sounds like a long day. Maybe take a short break and drink some water.",
                        "You've earned a rest. A short break might help."],
-        FRIEND: ["Arre, thak gayi? Thoda break le le yaar, pani pi.", "Chal 10 minute aankh band kar le, main hoon na.",
+        FRIEND: ["Arre, thak gay{u_a} kya? Thoda break le le yaar, pani pi.", "Chal 10 minute aankh band kar le, main hoon na.",
                  "Bas, ab laptop band karke aaram kar thoda. Music laga doon?"],
     },
     "feel_bored": {
         PROFESSIONAL: ["Want me to play some music or tell you a joke?", "How about some music, or a joke?"],
-        FRIEND: ["Bore ho rahi ho? Chal gaana lagaun ya joke sunaun?", "Boring scene hai? Ek joke sun, mood ban jayega.",
+        FRIEND: ["Bore ho rah{u_a} hai? Chal gaana lagaun ya joke sunaun?", "Boring scene hai? Ek joke sun, mood ban jayega.",
                  "Arre, music laga doon? Bas bol 'play' aur gaane ka naam."],
     },
     "feel_stressed": {
@@ -226,6 +232,39 @@ PHRASES = {
         FRIEND: ["Waise {time} baj gaye, so ja ab. Kal baat karte hain", "Raat ke {time} ho gaye! Neend nahi aa rahi kya?",
                  "Oye, {time} baj gaye. Thoda so le yaar"],
     },
+    # ---------------------------------------------------------------- when the AI can't answer
+    "ai_down": {
+        PROFESSIONAL: ["Sorry, my main AI and my backup AI are both unavailable right now. Please try again in a minute."],
+        FRIEND: ["Net thoda slow hai yaar, ek minute mein try karte hain", "Arre, dimaag thoda hang ho gaya. Ek minute baad poochna?",
+                 "Abhi mera AI jawab nahi de raha yaar. Thodi der mein phir try karte hain"],
+    },
+    "ai_busy": {  # rate limit / quota
+        PROFESSIONAL: ["I've used up the free AI quota or hit the rate limit. Try again in a minute, "
+                       "or tomorrow if the daily limit is used up."],
+        FRIEND: ["Aaj bahut baatein ho gayi yaar, AI ki limit khatam. Ek minute baad try karte hain",
+                 "Thoda saans lene de yaar, AI limit hit ho gayi. Ek minute ruk",
+                 "AI ka quota full ho gaya. Thodi der mein phir pooch na"],
+    },
+    "ai_trouble": {  # 5xx
+        PROFESSIONAL: ["The AI service is having problems right now. Please try again in a bit."],
+        FRIEND: ["AI service mein abhi kuch gadbad hai yaar. Thodi der mein try karein?",
+                 "Server ka mood off hai abhi. Ek minute baad poochna?", "Abhi AI side pe problem hai, thoda ruk ke try kar"],
+    },
+    "no_reply": {
+        PROFESSIONAL: ["I'm not sure what to say to that."],
+        FRIEND: ["Hmm, iska jawab nahi soojh raha yaar. Thoda aur bata?", "Pakka nahi pata yaar. Thoda aur detail de?",
+                 "Ispe kuch nahi soojha. Doosre tareeke se pooch na?"],
+    },
+    "cant_do": {  # an action Jarvis has no skill for, when the AI didn't word it itself
+        PROFESSIONAL: ["I can't do that yet. Shall I {alternative} instead?"],
+        FRIEND: ["Ye toh abhi nahi kar sak{ta} yaar, par {alternative}, chalega?",
+                 "Yeh abhi mere bas ka nahi hai. {alternative} kar doon?",
+                 "Ye wala abhi nahi aata mujhe. Par {alternative}, bol toh kar dun{ga}"],
+    },
+    "backup_switch": {
+        PROFESSIONAL: ["Switching to my backup brain."],
+        FRIEND: ["Backup dimaag se pooch{ta} hoon.", "Ek sec, backup AI laga{ta} hoon.", "Backup brain on!"],
+    },
     # ---------------------------------------------------------------- personality switch
     "mode_professional": {
         PROFESSIONAL: ["Okay, I'll keep it professional."],
@@ -243,7 +282,7 @@ PHRASES = {
 
 # AQI by category (friend mode; professional keeps the original advice text)
 AQI_FRIEND = {
-    "Good": ["{place} mein AQI {aqi} hai, ekdum fresh hawa! Bahar ja sakti ho.",
+    "Good": ["{place} mein AQI {aqi} hai, ekdum fresh hawa! Bahar ja sak{u_ta} hai.",
              "AQI {aqi} in {place}. Hawa mast hai aaj, walk pe nikal ja!"],
     "Satisfactory": ["{place} mein AQI {aqi} hai, theek-thaak. Bahar jaana chalega.",
                      "AQI {aqi}, {place}. Thik hai, bas zyada der bahar mat rukna agar asthma hai."],
@@ -297,9 +336,14 @@ def voice_is_female():
     return not any(name in voice.lower() for name in MALE_VOICES)
 
 
+def user_is_female():
+    return (config.USER_GENDER or "female").lower().startswith("f")
+
+
 def _verb_forms():
-    female = voice_is_female()
-    return {"ta": "ti" if female else "ta", "ga": "gi" if female else "ga", "a": "i" if female else "a"}
+    me, you = voice_is_female(), user_is_female()
+    return {"ta": "ti" if me else "ta", "ga": "gi" if me else "ga", "a": "i" if me else "a",
+            "u_a": "i" if you else "a", "u_ta": "ti" if you else "ta"}
 
 
 def part_of_day(now=None):
@@ -350,7 +394,7 @@ def aqi_line(place, aqi, category_name, advice):
     options = AQI_FRIEND.get(category_name)
     if not options:
         return None
-    return _pick("aqi_" + category_name, options).format(place=place, aqi=aqi)
+    return _pick("aqi_" + category_name, options).format(place=place, aqi=aqi, **_verb_forms())
 
 
 def feeling(text):
@@ -387,19 +431,46 @@ def restyle(text):
 
 
 # ---------------------------------------------------------------- the AI's style
-def ai_style():
-    """Added to the AI's system prompts."""
+def grammar_rule():
+    """How Hindi verbs agree, for the AI: Jarvis's own gender and the user's."""
+    me = "male" if not voice_is_female() else "female"
+    you = "female" if user_is_female() else "male"
+    mine = ("'main kar dunga', 'main aa gaya', 'samajh gaya', 'bata dunga'" if me == "male"
+            else "'main kar dungi', 'main aa gayi', 'samajh gayi', 'bata dungi'")
+    yours = ("'tu kaisi hai?', 'thak gayi kya?', 'tune khana kha liya?', 'aa gayi!'" if you == "female"
+             else "'tu kaisa hai?', 'thak gaya kya?', 'tune khana kha liya?', 'aa gaya!'")
+    return (f"Hindi grammar: you are {me}, so use {me} verb forms for yourself ({mine}); {nickname()} is {you}, "
+            f"so address {'her' if you == 'female' else 'him'} with {you} forms ({yours}). ")
+
+
+LANGUAGE_RULE = ("Match the user's language: English question -> English answer; Hinglish -> Hinglish; Hindi "
+                 "(Devanagari) -> Hinglish. Hinglish is always written in Roman letters, never Devanagari (the voice "
+                 "can't read it). ")
+
+
+def ai_style(brief=False):
+    """Added to the AI's system prompts. brief: the short version for the routing call, which is sent with the whole
+    tool list on every command (Groq's free tier allows 7,000 input tokens a minute)."""
     if not is_friend():
-        return ("Tone: polite, clear and professional, like a capable personal assistant. ")
-    me = "female" if voice_is_female() else "male"
-    verbs = "'main dekhti hoon', 'bata dungi'" if me == "female" else "'main dekhta hoon', 'bata dunga'"
+        return "Tone: polite, clear and professional, like a capable personal assistant. " + LANGUAGE_RULE
+    if brief:
+        return (f"Talk like {nickname()}'s close Delhi friend: casual, warm, a bit witty, short (1-3 sentences). "
+                + LANGUAGE_RULE + grammar_rule() +
+                "Give real opinions with reasons; practical advice, no lectures (health, money, legal: add 'doctor/CA "
+                "se confirm kar lena'). If unsure, say so ('Pakka nahi pata yaar...'); never make up facts. ")
     return (
-        f"Tone: talk like {nickname()}'s close friend from Delhi, not a formal assistant. Casual and warm, a bit witty; "
-        "light teasing is fine, never rude. Short replies, like a friend talking, not a manual. "
-        "Mix English and Hindi naturally in Roman letters, the way Delhi friends talk (arre, yaar, chal, haan bata, "
-        "sahi hai, done!), but don't overdo the slang and keep facts in plain words. "
-        f"You are {me}: use {me} Hindi verb forms for yourself, e.g. {verbs}. "
-        "Still be honest: say so when the user is wrong or when you don't know, and never make up facts. "
+        f"Tone: talk like {nickname()}'s close friend from Delhi, not a formal assistant. Casual and warm, a bit "
+        "witty; light teasing is fine, never rude. Short and natural by default (1 to 3 sentences), like a friend "
+        "talking, not a manual; more detail only when asked ('explain karo', 'detail mein bata'). "
+        + LANGUAGE_RULE +
+        "In Hinglish, talk the way Delhi friends do (arre, yaar, chal, haan bata, sahi hai) without overdoing the "
+        "slang; in English, keep the same casual, warm tone in plain English. "
+        + grammar_rule() +
+        "Opinions ('tu kya sochta hai?'): give a real take with your reasons, don't dodge; on serious topics stay "
+        "honest and balanced. Advice: practical and caring, no lectures; for health, money or legal questions give "
+        "a useful answer plus a short 'doctor/CA/lawyer se confirm kar lena' when it matters. "
+        "Honesty: if you don't know or aren't sure, say so plainly ('Pakka nahi pata yaar, par jo pata hai woh ye "
+        "hai...'); tell the user when they're wrong; never make up facts, numbers, names or dates. "
     )
 
 

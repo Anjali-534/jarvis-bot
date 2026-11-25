@@ -56,7 +56,9 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(persona, "choose", lambda options: options[0])
     monkeypatch.setattr(persona, "AVOID_REPEAT", False)
     monkeypatch.setattr(config, "TTS_ENGINE", "pyttsx3")  # no neural voice downloads
-    monkeypatch.setattr(config, "TTS_VOICE", "en-IN-NeerjaNeural")
+    monkeypatch.setattr(config, "TTS_VOICE", "en-IN-PrabhatNeural")  # Jarvis is male, the user female
+    monkeypatch.setattr(config, "VOICE_NAME", "david")
+    monkeypatch.setattr(config, "USER_GENDER", "female")
     monkeypatch.setattr(config, "TTS_CACHE_DIR", tmp_path / "data" / "tts_cache")
     monkeypatch.setattr(config, "WAQI_TOKEN", "")
     monkeypatch.setattr(config, "AI_API_KEY", "")
