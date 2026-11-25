@@ -94,11 +94,22 @@ def test_search_answers_by_voice(web, caplog):
     assert ctx.voice.said == [browse.CHECKING, "Petrol costs Rs 94.77 a litre in Delhi as of 23 November 2026.",
                               "That's unchanged from yesterday."]  # streamed, sentence by sentence
     assert web["searches"] == ["petrol price in delhi today"]
+    assert web["downloads"] == []  # quick answer: from the search results alone, no pages fetched
     prompt = prompt_text(web["prompts"][0])
-    assert "ONLY the numbered web sources" in prompt and browse.NO_ANSWER in prompt
-    assert "[1] Petrol Price in Delhi Today (goodreturns.in)" in prompt and "Rs 94.77 per litre" in prompt
+    assert "ONLY the numbered search results" in prompt and browse.NO_ANSWER in prompt
+    assert "[1] Petrol Price in Delhi Today (goodreturns.in)\nRs 94.77 today" in prompt
+    assert "1 or 2 short sentences" in prompt
     assert "say the date they apply to" in prompt and "Reply in English." in prompt
     assert "Sources (ddgs):" in caplog.text and "[1] Petrol Price in Delhi Today - https://www.goodreturns.in" in caplog.text
+
+
+def test_checking_online_is_said_before_the_search_starts(web, monkeypatch):
+    ctx = make_ctx()
+    heard_before_search = []
+    real = web_ddgs = browse.ddgs_text
+    monkeypatch.setattr(browse, "ddgs_text", lambda q: heard_before_search.extend(ctx.voice.said) or web_ddgs(q))
+    handle(ctx, "search the web for latest iphone")
+    assert heard_before_search == [browse.CHECKING] and real
 
 
 @pytest.mark.parametrize("phrase, query", [
@@ -116,6 +127,9 @@ def test_search_phrases(web, phrase, query):
 
 def test_reads_top_3_pages_and_skips_pdfs_and_paywalls(web):
     found = browse.search("petrol price in delhi today")
+    assert web["downloads"] == [] and not found.get("deep")
+    found = browse.deepen(found)
+    assert found["deep"]
     assert web["downloads"] == [HITS[0]["href"], HITS[3]["href"], HITS[4]["href"]]  # not the PDF or WSJ
     urls = [s["url"] for s in found["sources"]]
     assert urls[:2] == [HITS[0]["href"], HITS[3]["href"]]  # pages actually read come first
@@ -209,22 +223,55 @@ def test_relevant_text_cuts_one_huge_paragraph():
 
 # ---------------------------------------------------------------- answers
 def test_no_reliable_answer(web):
-    web["answers"].append(browse.NO_ANSWER)
+    web["answers"] += [browse.NO_ANSWER, browse.NO_ANSWER]  # not in the snippets, not in the pages either
     ctx = make_ctx()
     handle(ctx, "search the web for the exact number of ants on earth today")
     assert ctx.voice.said == [browse.CHECKING, browse.NO_ANSWER]
+    assert len(web["prompts"]) == 2 and web["downloads"]  # the pages were read before giving up
 
 
-def test_hinglish_question_gets_hinglish_answer(web, monkeypatch):
-    monkeypatch.setattr(config, "AI_ROUTING", True)
-    web["route_reply"].append(tool_call("web_search", query="petrol price in delhi today"))
+def test_snippets_that_dont_answer_lead_to_reading_the_pages(web):
+    web["answers"] += [browse.NO_ANSWER + " The snippets are vague.", "Petrol is Rs 94.77 a litre in Delhi."]
+    ctx = make_ctx()
+    handle(ctx, "search the web for petrol price in delhi today")
+    assert ctx.voice.said == [browse.CHECKING, "Petrol is Rs 94.77 a litre in Delhi."]  # "couldn't find" never spoken
+    assert web["downloads"] == [HITS[0]["href"], HITS[3]["href"], HITS[4]["href"]]
+    second = prompt_text(web["prompts"][1])
+    assert "ONLY the numbered web sources" in second and "Rs 94.77 per litre" in second  # the page text
+    assert ctx.state["last_search"]["found"]["deep"]
+
+
+def test_tavily_answer_is_rephrased_without_fetching_pages(web, monkeypatch):
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "tvly-test")
+    monkeypatch.setattr(browse, "tavily_search", lambda q, t: {"answer": "Petrol in Delhi costs Rs 94.77 per litre.",
+        "results": [{"title": "Fuel prices", "url": "https://fuel.example.com", "content": "Petrol Rs 94.77."}]})
+    web["answers"].append("Petrol costs Rs 94.77 a litre in Delhi today, 25 November.")
+    ctx = make_ctx()
+    handle(ctx, "search the web for petrol price in delhi today")
+    prompt = prompt_text(web["prompts"][0])
+    assert "The search engine's own answer (rephrase it for speaking" in prompt
+    assert "Petrol in Delhi costs Rs 94.77 per litre." in prompt and "1 or 2 short sentences" in prompt
+    assert web["downloads"] == [] and web["searches"] == []
+    assert ctx.voice.said == [browse.CHECKING, "Petrol costs Rs 94.77 a litre in Delhi today, 25 November."]
+
+
+def test_vague_questions_name_what_was_found(web):
+    handle(make_ctx(), "who won the cricket match yesterday")
+    prompt = prompt_text(web["prompts"][0])
+    assert "answer for the most relevant or most recent one in the sources and name it" in prompt
+    assert "India vs Australia on 24 November: India won by 5 wickets" in prompt
+
+
+def test_hinglish_question_gets_hinglish_answer(web):
     web["answers"].append("Delhi mein aaj petrol Rs 94.77 per litre hai, 23 November 2026 tak.")
     ctx = make_ctx()
-    assert handle(ctx, "aaj delhi mein petrol ka rate kya hai") == "web search"
+    assert handle(ctx, "aaj delhi mein petrol ka rate kya hai") == "web question"  # regex fast path
     prompt = prompt_text(web["prompts"][0])
     assert "Reply in Hinglish (Hindi written ONLY in Roman letters" in prompt
-    assert "Question: aaj delhi mein petrol ka rate kya hai" in prompt  # the user's own words, not the English query
-    assert web["searches"] == ["petrol price in delhi today"]
+    assert "Question: aaj delhi mein petrol ka rate kya hai" in prompt
+    assert web["searches"] == [browse.search_query("today delhi petrol rate")]  # searched in English words
+    assert web["searches"][0].startswith("delhi petrol rate ")  # + today's date
+    assert web["routes"] == []
     assert ctx.voice.last == "Delhi mein aaj petrol Rs 94.77 per litre hai, 23 November 2026 tak."
 
 
@@ -239,7 +286,7 @@ def test_without_an_ai_key_it_reads_what_it_found(web, monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "")
     ctx = make_ctx()
     handle(ctx, "search the web for petrol price in delhi")
-    assert ctx.voice.last.startswith("Here's what I found online. Petrol price in Delhi")
+    assert ctx.voice.last == "Here's what I found online. Rs 94.77 today"
 
 
 # ---------------------------------------------------------------- follow-ups
@@ -247,10 +294,13 @@ def test_tell_me_more_uses_the_same_sources(web):
     ctx = make_ctx()
     handle(ctx, "search the web for petrol price in delhi today")
     web["answers"].append("Petrol is Rs 94.77 a litre in Delhi as of 23 November 2026. Diesel and CNG are listed too.")
+    assert web["downloads"] == []
     assert handle(ctx, "tell me more") == "tell me more"
     assert len(web["searches"]) == 1  # no new search
+    assert web["downloads"] == [HITS[0]["href"], HITS[3]["href"], HITS[4]["href"]]  # now the pages are read
     assert web["prompts"][1]["max_tokens"] == browse.DETAIL_TOKENS
     assert "5 to 7 short sentences" in prompt_text(web["prompts"][1])
+    assert "Rs 94.77 per litre" in prompt_text(web["prompts"][1])
 
 
 def test_tell_me_more_without_a_search_is_chat(web):
@@ -263,7 +313,7 @@ def test_which_website(web, phrase):
     ctx = make_ctx()
     handle(ctx, "search the web for petrol price in delhi today")
     assert handle(ctx, phrase) == "search sources"
-    assert ctx.voice.last == ("That came from goodreturns.in, mypetrolprice.com and example.org. "
+    assert ctx.voice.last == ("That came from goodreturns.in, example.org and wsj.com. "
                               "The full list is in the terminal.")
 
 
@@ -276,7 +326,7 @@ def test_which_website_before_any_search(web):
 @pytest.mark.parametrize("phrase, url", [
     ("open the first source", HITS[0]["href"]),
     ("open that in chrome", HITS[0]["href"]),
-    ("open the second link", HITS[3]["href"]),
+    ("open the second link", HITS[1]["href"]),  # in search-result order
     ("show me the first result in the browser", HITS[0]["href"]),
 ])
 def test_open_a_source(web, phrase, url):
@@ -360,8 +410,9 @@ def test_slow_pages_fall_back_to_snippets(web, monkeypatch):
         return web["pages"].get(url)
 
     monkeypatch.setattr(browse, "download", slow_download)
-    started = time.monotonic()
     found = browse.search("petrol price in delhi today")
+    started = time.monotonic()
+    found = browse.deepen(found)
     assert time.monotonic() - started < 1.5
     goodreturns = next(s for s in found["sources"] if "goodreturns" in s["url"])
     assert goodreturns["text"] == "Rs 94.77 today"  # the search snippet, since the page was too slow
@@ -369,11 +420,14 @@ def test_slow_pages_fall_back_to_snippets(web, monkeypatch):
 
 
 def test_pages_cut_off_at_the_deadline_still_give_an_answer(web, monkeypatch):
-    """The search arrives late; pages still loading at the deadline are dropped, but the snippets are kept."""
+    """Pages still loading at the deadline are dropped, but the snippets are kept."""
     monkeypatch.setattr(config, "SEARCH_BUDGET", 0.6)
     monkeypatch.setattr(browse, "ddgs_text", lambda q: time.sleep(0.4) or [dict(h) for h in HITS])
     monkeypatch.setattr(browse, "download", lambda url, timeout=4: time.sleep(2) or PETROL_PAGE)
     found = browse.search("petrol price in delhi today")
+    started = time.monotonic()
+    found = browse.deepen(found)
+    assert time.monotonic() - started < 1.0
     assert found and found["sources"][0]["text"] == "Rs 94.77 today"
 
 
@@ -390,19 +444,73 @@ def routing(web, monkeypatch):
     return web
 
 
-@pytest.mark.parametrize("question, query", [
-    ("who won the match yesterday", "who won the cricket match yesterday"),
-    ("petrol price in delhi today", "petrol price in delhi today"),
-    ("latest iphone", "latest iphone model"),
+@pytest.mark.parametrize("question", [
+    "who won the match yesterday", "who won the cricket match yesterday", "petrol price in delhi today",
+    "latest iphone", "tell me the gold rate today", "sone ka bhav aaj kya hai", "sensex today",
+    "what's the score of the india match", "who is the current prime minister of the uk",
+    "can you tell me the bitcoin price right now",
 ])
-def test_routing_sends_live_questions_to_the_web(routing, question, query):
-    routing["route_reply"].append(tool_call("web_search", query=query))
+def test_obvious_live_questions_skip_ai_routing(routing, question):
     ctx = make_ctx()
-    assert handle(ctx, question) == "web search"
-    assert routing["searches"] == [query]
+    assert handle(ctx, question) == "web question"
+    assert routing["routes"] == []  # regex fast path: no AI routing call
+    assert len(routing["searches"]) == 1 and len(routing["prompts"]) == 1  # one search, one AI call in total
+
+
+def test_routing_sends_other_live_questions_to_the_web(routing):
+    routing["route_reply"].append(tool_call("web_search", query="tesla model y cost in india"))
+    ctx = make_ctx()
+    assert handle(ctx, "how much does a tesla model y cost in india") == "web search"
+    assert routing["searches"] == ["tesla model y cost in india"]
     body = routing["routes"][0]["payload"]
     assert "web_search" in {t["function"]["name"] for t in body["tools"]}
     assert "Use web_search for current events" in body["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("phrase", [
+    "how are you today", "what should i cook today", "what's my schedule today", "what's the weather today",
+    "aqi today", "remind me to call mom today", "what's the latest you can tell me about yourself",
+    "play the latest arijit singh songs", "news", "latest", "what is today's date",
+])
+def test_personal_and_other_skill_phrases_dont_take_the_fast_path(phrase):
+    from jarvis.router import SKILLS
+    from jarvis.skills import web_questions
+
+    for sk in SKILLS:
+        match = next((m for m in (p.search(phrase) for p in sk.patterns) if m), None)
+        if sk.name == "web question":
+            assert match is None or web_questions.web_question(make_ctx(), phrase, match) is None, phrase
+            return
+        if match:
+            return  # an earlier skill gets it first
+
+
+@pytest.mark.parametrize("text, query", [
+    ("who won the cricket match yesterday", "cricket match result 24 November 2026"),
+    ("who won the match last night", "match result 24 November 2026"),
+    ("petrol price in delhi today", "petrol price in delhi 25 November 2026"),
+    ("today's gold rate in mumbai", "gold rate in mumbai 25 November 2026"),
+    ("latest iphone", "latest iphone"),
+    ("sone ka bhav aaj kya hai", "gold rate 25 November 2026"),
+    ("kal ka match kaun jeeta", "match result 24 November 2026"),
+    ("abhi bitcoin ka price kitna hai", "now bitcoin price"),
+    ("tell me the gold rate in me", "tell me the gold rate in me"),  # English stays as it is
+])
+def test_search_query_puts_in_the_date(text, query):
+    from datetime import datetime
+
+    assert browse.search_query(text, now=datetime(2026, 11, 25, 9, 0)) == query
+
+
+def test_timing_breakdown(web):
+    from jarvis import timing
+
+    turn = timing.begin()
+    handle(make_ctx(), "petrol price in delhi today")
+    assert {"search", "ai"} <= set(turn.durations) and "answer" in turn.marks
+    assert "fetch" not in turn.durations  # no pages read for a quick answer
+    line = timing.finish()
+    assert "web search" in line and "AI to first sentence" in line and "first answer sentence ready at" in line
 
 
 def test_search_the_web_needs_no_routing(routing):
@@ -419,8 +527,8 @@ def test_maths_and_jokes_dont_browse(routing, phrase, skill_name):
 
 
 def test_current_role_questions_skip_wikipedia(routing):
-    routing["route_reply"].append(tool_call("web_search", query="current CEO of Twitter"))
-    assert handle(make_ctx(), "who is the current ceo of twitter") == "web search"
+    assert handle(make_ctx(), "who is the current ceo of twitter") == "web question"
+    assert routing["searches"] == ["who is the current ceo of twitter"]
 
 
 # ---------------------------------------------------------------- ddgs engines asked in parallel

@@ -1,4 +1,5 @@
-"""Per-turn latency measurements: wake word, speech detected, end of phrase, speech-to-text, skill, speech.
+"""Per-turn latency measurements: wake word, speech detected, end of phrase, speech-to-text, skill, speech
+(and for web answers: search, page reading, AI, first answer sentence).
 
 Logged at DEBUG level, or printed for every turn with `python main.py --timing`.
 """
@@ -15,6 +16,10 @@ STAGES = [  # (key, label) in the order they're reported
     ("end", "end of phrase"),
     ("stt", "speech-to-text"),
     ("skill", "routing + skill"),
+    ("search", "web search"),       # browse: the search engine
+    ("fetch", "page reading"),      # browse: only when the search results didn't answer it
+    ("ai", "AI to first sentence"),
+    ("answer", "first answer sentence ready"),  # handed to the speech queue
     ("tts", "text-to-speech"),
 ]
 

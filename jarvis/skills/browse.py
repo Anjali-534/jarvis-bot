@@ -3,10 +3,15 @@
 Search providers, tried in order (SEARCH_PROVIDER, default "auto" = tavily, groq, ddgs):
 - tavily: Tavily's search API, if TAVILY_API_KEY is set (an answer plus the top 5 results with their content);
 - groq:   Groq's built-in web-search models (groq/compound-mini, groq/compound), if the key has access to one;
-- ddgs:   free, no key: DuckDuckGo for the top 5 links, then the top 3 pages are fetched in parallel and their
-          main text extracted with trafilatura.
-The sources (trimmed to about 1,500 words) go to the AI, which must answer ONLY from them. The whole search
-has an 8 s budget (SEARCH_BUDGET); whatever has arrived by then is used. Results are cached for 30 minutes.
+- ddgs:   free, no key: the top 5 results from several engines (DuckDuckGo's ddgs package), asked in parallel.
+Quick answer first: the AI answers from the search results alone (Tavily's own answer, or the result
+snippets), in 1-2 spoken sentences. Only when they don't answer it, or for "tell me more", are the top 3
+pages fetched in parallel and their main text extracted with trafilatura (trimmed to about 1,500 words).
+The AI must answer ONLY from the sources. The search has an 8 s budget (SEARCH_BUDGET); whatever has
+arrived by then is used. Results are cached for 30 minutes.
+Obvious web questions ("petrol price today", "who won the match yesterday") come here by regex
+(skills/web_questions.py), without the AI routing call. `python main.py --timing` shows search, page
+reading and AI time per turn.
 
 Follow-ups use ctx.state["last_search"]: "tell me more", "which website said that", "open the first source",
 "search more about X".
@@ -16,16 +21,16 @@ import re
 import threading
 import time
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import quote_plus, urlparse
 
 import config
-from jarvis import cache, http
+from jarvis import cache, http, timing
 from jarvis.router import on_startup, skill
 
 log = logging.getLogger(__name__)
 
-CHECKING = "Let me check online."
+CHECKING = "Checking online."
 NO_ANSWER = "I couldn't find a reliable answer."
 NOTHING_FOUND = "I couldn't find anything online about that right now. Please try again in a bit."
 NO_SEARCH_YET = "I haven't searched for anything yet."
@@ -44,7 +49,9 @@ PAYWALLED = ("wsj.com", "ft.com", "nytimes.com", "economist.com", "bloomberg.com
 _PAYWALL_TEXT = re.compile(r"subscribe to (?:continue|read)|to continue reading|this (?:article|content) is for "
                            r"(?:subscribers|members)|already a subscriber|sign in to (?:continue|read)", re.IGNORECASE)
 COMPOUND_MODELS = ("groq/compound-mini", "groq/compound")
-DDGS_BACKENDS = ("yahoo", "bing", "google", "duckduckgo", "brave", "mojeek")  # asked in parallel
+# asked in parallel. Measured Nov 2026 (ddgs 9.16): yahoo answers in ~1.3 s when it answers, "auto" in 2-5 s;
+# duckduckgo, brave and mojeek fail at once from here but cost nothing to ask (bing and google aren't offered).
+DDGS_BACKENDS = ("yahoo", "auto", "duckduckgo", "brave", "mojeek")
 GRACE = 1.0  # seconds past the budget for a provider to return what it already has
 _STOP = {"the", "and", "for", "what", "who", "how", "is", "are", "was", "today", "latest", "with", "from", "about",
          "of", "in", "on", "at", "to", "a", "an", "me", "tell", "search", "web", "please", "kya", "hai", "aaj"}
@@ -283,17 +290,11 @@ def ddgs_text(query):
 
 
 def search_ddgs(query, deadline):
+    """The result snippets only; the pages are read later if they're needed (see deepen)."""
     hits = within(lambda: ddgs_text(query), remaining(deadline))
     hits = [h for h in hits or [] if h.get("href")][:RESULTS]
-    to_read = [h["href"] for h in hits if fetchable(h["href"])][:PAGES]
-    pages = read_pages(to_read, deadline) if to_read else {}
-    sources = []
-    for hit in hits:
-        text = pages.get(hit["href"]) or hit.get("body") or ""  # the search snippet if the page didn't arrive
-        if text:
-            sources.append({"title": hit.get("title") or site_name(hit["href"]), "url": hit["href"], "text": text})
-    sources.sort(key=lambda s: s["url"] not in pages)  # pages actually read first
-    return {"summary": "", "sources": sources}
+    return {"summary": "", "sources": [{"title": h.get("title") or site_name(h["href"]), "url": h["href"],
+                                        "text": h.get("body") or ""} for h in hits if h.get("body")]}
 
 
 PROVIDERS = {"tavily": search_tavily, "groq": search_groq, "ddgs": search_ddgs}
@@ -312,6 +313,14 @@ def search(query, budget=None):
     cached = cache.get(key, config.SEARCH_CACHE_MINUTES * 60)
     if cached:
         return cached
+    started_search = time.perf_counter()
+    try:
+        return _search(query, key, budget)
+    finally:
+        timing.add("search", time.perf_counter() - started_search)
+
+
+def _search(query, key, budget):
     deadline = time.monotonic() + (budget or config.SEARCH_BUDGET)
     for name in provider_order():
         if remaining(deadline) < 0.3:
@@ -335,6 +344,73 @@ def search(query, budget=None):
     return None
 
 
+def deepen(found, budget=None):
+    """The same search with the top pages read in full (for "tell me more", or when the snippets didn't answer).
+    Pages that can't be read in time keep their snippet."""
+    if found.get("deep"):
+        return found
+    started = time.perf_counter()
+    deadline = time.monotonic() + (budget or config.SEARCH_BUDGET)
+    urls = [s["url"] for s in found["sources"] if fetchable(s.get("url"))][:PAGES]
+    pages = read_pages(urls, deadline) if urls else {}
+    timing.add("fetch", time.perf_counter() - started)
+    sources = [{**s, "text": pages.get(s.get("url")) or s["text"]} for s in found["sources"]]
+    sources.sort(key=lambda s: s.get("url") not in pages)  # pages actually read first
+    deep = {**found, "sources": trim_sources(sources, found["query"]), "deep": True}
+    log.info("[browse] read %d of %d pages in %.1f s", len(pages), len(urls), time.perf_counter() - started)
+    cache.put("browse|" + found["query"].lower(), deep)
+    return deep
+
+
+# ---------------------------------------------------------------- the search query
+_YESTERDAY = re.compile(r"\b(?:yesterday(?:'s)?|last night(?:'s)?)\b")
+_TODAY = re.compile(r"\b(?:today(?:'s)?|tonight(?:'s)?)\b")
+_WHO_WON = re.compile(r"^who won (?:the |that |last )?(.+?)$")
+# Hinglish words -> English search words ("sone ka bhav aaj kya hai" -> "gold rate today"): English pages
+# carry the numbers in their snippets far more often. None = drop the word.
+_HINGLISH_WORDS = {
+    "sona": "gold", "sone": "gold", "chandi": "silver", "chaandi": "silver", "bhav": "rate", "bhaav": "rate",
+    "daam": "price", "keemat": "price", "kimat": "price", "aaj": "today", "abhi": "now", "jeeta": "won",
+    "jeeti": "won", "kaun": "who", "kisne": "who", "khabar": "news", "khabrein": "news",
+    "kya": None, "hai": None, "hain": None, "ka": None, "ki": None, "ke": None, "ko": None, "kitna": None,
+    "kitni": None, "kitne": None, "batao": None, "bataiye": None, "bata": None, "mein": None, "me": None,
+    "tha": None, "thi": None, "raha": None, "rahi": None, "chal": None,
+}
+
+
+def _in_english(text):
+    words = text.split()
+    if len(_HINGLISH.findall(text)) < 2:
+        return text
+    english = [_HINGLISH_WORDS.get(w, w) for w in words]
+    english = [w for w in english if w]
+    if "won" in english and "who" in english:  # "kal ka match kaun jeeta" -> "who won match yesterday"
+        english = ["who", "won"] + [w for w in english if w not in ("who", "won")]
+        english = ["yesterday" if w == "kal" else w for w in english]
+    return " ".join(english) or text
+
+
+def search_query(text, now=None):
+    """What to type into the search engine: Hinglish in English words, relative days as dates ("who won the
+    cricket match yesterday" -> "cricket match result 24 November 2026"), so the results are about the right day.
+    """
+    now = now or datetime.now()
+    query = _in_english(re.sub(r"\s+", " ", (text or "").strip(" ?.!")).strip())
+    text = query
+    won = _WHO_WON.match(query)
+    if won:
+        query = won.group(1) + " result"
+    query = _YESTERDAY.sub("", query)  # put the date at the end, where it reads naturally
+    day = None
+    if _YESTERDAY.search(text or ""):
+        day = now - timedelta(days=1)
+    elif _TODAY.search(query):
+        query, day = _TODAY.sub("", query), now
+    if day:
+        query = f"{query} {day.day} {day:%B %Y}"
+    return re.sub(r"\s+", " ", query).strip()
+
+
 # ---------------------------------------------------------------- answering from the sources
 _HINGLISH = re.compile(r"\b(?:kya|kaun|kaunsa|kaunsi|kitn[aie]|kaise|kab|kahan|kyun|hai|hain|tha|thi|batao|bataiye|"
                        r"bata|dekho|aaj|kal|abhi|mein|ka|ki|ke|ko|wala|wali|jeeta|jeeti|kiska|kiski)\b")
@@ -348,24 +424,31 @@ def wants_hinglish(ctx, text):
 
 
 def answer_prompt(question, found, detail=False, hinglish=False, earlier=None):
+    quick = not detail and not found.get("deep")
     length = ("5 to 7 short sentences with the useful details" if detail
-              else "2 or 3 short sentences")
-    language = ("Reply in Hinglish (Hindi written ONLY in Roman letters, never Devanagari). " if hinglish
-                else "Reply in English. ")
+              else "1 or 2 short sentences" if quick else "2 or 3 short sentences")
+    language = ("Reply in Hinglish (Hindi written ONLY in Roman letters, never Devanagari), except that sentence, "
+                "which stays in English. " if hinglish else "Reply in English. ")
+    what = ("search results (titles and short snippets)" if quick else "web sources")
     system = (
         f"You are {config.ASSISTANT_NAME}, a voice assistant. Today is {datetime.now():%A %d %B %Y}. "
-        f"Answer the question using ONLY the numbered web sources below (fetched {found['at']}), never your own "
+        f"Answer the question using ONLY the numbered {what} below (found {found['at']}), never your own "
         "knowledge. Your reply is spoken: " + length + ", plain speech, no markdown, no URLs, no [1] numbers. "
+        "Start with the answer itself. "
         "For time-sensitive facts (prices, scores, results, news, who holds a job now) say the date they apply to. "
-        f"If the sources don't clearly answer the question, or contradict each other, reply exactly: {NO_ANSWER} "
+        "If the question leaves out a detail (which match, which city, which model), answer for the most relevant "
+        "or most recent one in the sources and name it, for example: India vs Australia on 24 November: India won "
+        "by 5 wickets. "
+        f"Only if the {what} don't contain the answer at all, or contradict each other, reply exactly: {NO_ANSWER} "
         + language
     )
     parts = [f"Question: {question}"]
     if earlier:
         parts.append(f"(Earlier question in this conversation: {earlier})")
     if found.get("summary"):
-        parts.append(f"Search engine summary (check it against the sources): {found['summary']}")
-    parts.append("Sources:")
+        parts.append(("The search engine's own answer (rephrase it for speaking, checked against the results): "
+                      if quick else "Search engine summary (check it against the sources): ") + found["summary"])
+    parts.append("Search results:" if quick else "Sources:")
     for number, source in enumerate(found["sources"], 1):
         where = site_name(source["url"]) or "web search"
         parts.append(f"[{number}] {source['title']} ({where})\n{source['text']}")
@@ -377,43 +460,80 @@ def source_list(found):
                      for n, s in enumerate(found["sources"], 1))
 
 
-def speak_answer(ctx, question, found, detail=False, earlier=None):
-    """Stream the AI's answer from the sources, sentence by sentence. Returns what's left for the router to say."""
+def _no_answer(sentence):
+    return "find a reliable answer" in sentence.lower().replace("’", "'")
+
+
+class _NeedPages(Exception):
+    """The search results alone didn't answer it: read the pages and ask again."""
+
+
+def _stream_answer(ctx, question, found, detail, earlier, pages_can_help):
+    """Speak the AI's answer sentence by sentence. Returns (spoken sentences, error to say or None)."""
     from jarvis.skills import ai
 
-    ctx.state["last_search"] = {"question": question, "found": found}
-    if not config.AI_API_KEY:
-        first = found.get("summary") or found["sources"][0]["text"]
-        return "Here's what I found online. " + " ".join(re.split(r"(?<=[.!?])\s+", first.strip())[:2])
     system, prompt = answer_prompt(question, found, detail, wants_hinglish(ctx, question), earlier)
     spoken = []
+    started = time.perf_counter()
     try:
         status, chunks = ai.stream(system, [], prompt, DETAIL_TOKENS if detail else SHORT_TOKENS)
         if status >= 400:
             log.warning("[browse] AI HTTP %s: %s", status, (chunks or "")[:200])
-            return ai.error_message(status, chunks)
+            return spoken, ai.error_message(status, chunks)
         ai.announce_switch(ctx)
         for sentence in ai.sentences(chunks):
             text = ai.strip_markdown(sentence)
             if not text:
                 continue
+            if not spoken:
+                timing.add("ai", time.perf_counter() - started)
+                if pages_can_help and _no_answer(text):
+                    close = getattr(chunks, "close", None)
+                    if close:
+                        close()
+                    raise _NeedPages()
+                timing.mark("answer")
             if getattr(ctx.voice, "_hushed", False):
                 break  # barge-in
             ctx.say(text, wait=False)
             spoken.append(text)
     except ai.BothFailed:
-        return ai.BOTH_DOWN
+        return spoken, ai.BOTH_DOWN
+    except _NeedPages:
+        raise
     except Exception as exc:
         if not spoken:
             raise
         log.warning("[browse] answer stream broke off: %s", exc)
+    return spoken, None
+
+
+def speak_answer(ctx, question, found, detail=False, earlier=None):
+    """Stream the AI's answer, sentence by sentence: from the search results first, and from the pages themselves
+    if those didn't answer it (or for "tell me more"). Returns what's left for the router to say."""
+    if detail:
+        found = deepen(found)
+    ctx.state["last_search"] = {"question": question, "found": found}
+    if not config.AI_API_KEY:
+        first = found.get("summary") or found["sources"][0]["text"]
+        return "Here's what I found online. " + " ".join(re.split(r"(?<=[.!?])\s+", first.strip())[:2])
+    try:
+        spoken, error = _stream_answer(ctx, question, found, detail, earlier, pages_can_help=not found.get("deep"))
+    except _NeedPages:
+        log.info("[browse] the search results didn't answer it; reading the pages")
+        found = deepen(found)
+        ctx.state["last_search"]["found"] = found
+        spoken, error = _stream_answer(ctx, question, found, detail, earlier, pages_can_help=False)
+    if error:
+        return error
     wait = getattr(ctx.voice, "wait_idle", None)
     if wait:
         wait()
     answer = " ".join(spoken) or NO_ANSWER
     ctx.state["last_search"]["answer"] = answer
     ctx.state["last_said"] = answer
-    log.info("\n%s\nSources (%s):\n%s", answer, found["provider"], source_list(found))
+    log.info("\n%s\nSources (%s%s):\n%s", answer, found["provider"], ", pages read" if found.get("deep") else "",
+             source_list(found))
     return "" if spoken else NO_ANSWER
 
 
@@ -421,7 +541,7 @@ def look_up(ctx, query, question=None, earlier=None):
     question = question or query
     cached = cache.get("browse|" + re.sub(r"\s+", " ", query).strip().lower(), config.SEARCH_CACHE_MINUTES * 60)
     if not cached:
-        ctx.say(CHECKING, wait=False)
+        ctx.say(CHECKING, wait=False)  # spoken in the background while the search runs
     found = search(query)
     if not found:
         return NOTHING_FOUND

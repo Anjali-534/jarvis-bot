@@ -80,11 +80,11 @@ Live Indian CPCB AQI for any area or pincode. Jarvis remembers your area for the
 - "News" / "news about cricket" / "tech news"
 
 ## Web search (answered by voice)
-Jarvis searches, reads the top pages and answers in 2 or 3 sentences, with the date for prices, scores and news. The full answer and the numbered sources are printed in the terminal. If the pages don't clearly answer, it says "I couldn't find a reliable answer" instead of guessing.
+Jarvis says "Checking online", searches, and answers in 1 or 2 sentences from the search results, with the date for prices, scores and news (usually 2 to 5 seconds). It reads the top pages only if the results don't answer it. The full answer and the numbered sources are printed in the terminal. If the pages don't clearly answer either, it says "I couldn't find a reliable answer" instead of guessing.
 - "Search the web for the latest iPhone" / "look up petrol price in Delhi today" / "google Python decorators"
-- "Who won the match yesterday" / "who is the current CEO of Twitter" / "latest iPhone" (no "search" needed)
+- "Who won the match yesterday" / "who is the current CEO of Twitter" / "latest iPhone" / "gold rate today" (no "search" needed; these skip the AI routing step)
 - "Sensex internet pe dekho" / "aaj Delhi mein petrol ka rate kya hai" (answers in Hinglish)
-- Then: "tell me more" (a longer answer from the same pages), "which website said that" / "source?", "open the first source" / "open that in Chrome", "search more about its battery life"
+- Then: "tell me more" (reads the pages for a longer answer), "which website said that" / "source?", "open the first source" / "open that in Chrome", "search more about its battery life"
 - "Open best laptops under 60000 in browser" / "show me in Chrome": opens Google results instead
 
 ## Notes and reminders

@@ -216,18 +216,21 @@ Spotify only allows apps to control playback on **Premium** accounts. Without a 
 
 **Web search, answered by voice** (no browser window)
 - "Search the web for the latest iPhone", "look up petrol price in Delhi today", "google Python decorators", "sensex internet pe dekho"
-- Questions about current events, prices, scores, "latest" or "today", and who holds a role now go to the web by themselves (through AI routing): "who won the match yesterday", "petrol price in Delhi today", "latest iPhone"
+- Obvious web questions skip the AI routing call (a regex in `jarvis/skills/web_questions.py` catches words like latest, today, aaj, price, rate, bhav, score, who won, current): "who won the match yesterday", "petrol price in Delhi today", "latest iPhone", "sone ka bhav aaj kya hai". Other current-events questions still reach the web through AI routing. Questions about you ("my", "I", "you") and phrases other skills own ("weather today", "AQI today", "news") are left alone.
 - Follow-ups: "tell me more", "which website said that" / "source?", "open the first source" / "open that in Chrome", "search more about its battery life"
 
 How it works (`jarvis/skills/browse.py`):
-1. Jarvis says "Let me check online" and searches with the first available provider in `SEARCH_PROVIDER` (default `auto`):
-   - **Tavily**, if `TAVILY_API_KEY` is set (free tier at <https://app.tavily.com>): an answer plus the top 5 results with content.
+1. Jarvis says "Checking online" (in the background) and searches with the first available provider in `SEARCH_PROVIDER` (default `auto`). Hinglish questions are searched in English words and "today"/"yesterday" become dates ("who won the cricket match yesterday" -> "cricket match result 24 November 2026").
+   - **Tavily**, if `TAVILY_API_KEY` is set (free tier at <https://app.tavily.com>): its own answer plus the top 5 results.
    - **Groq's web-search models** (`groq/compound-mini`, `groq/compound`), if your Groq key has them. Jarvis checks the model list once a day; the current free key doesn't.
-   - **Free, no key** (the `ddgs` package): the top 5 links, then the top 3 pages are read in parallel (4 s each; PDFs and paywalled sites are skipped) and their main text extracted with trafilatura.
-2. The sources are trimmed to about 1,500 words, keeping the paragraphs that mention your question, and sent to the AI with numbered sources and the rule "answer ONLY from these". The answer is 2 or 3 short sentences, gives the date for time-sensitive facts, and is spoken as it streams. Hindi or Hinglish questions get Hinglish answers in Roman letters.
-3. The answer and the numbered source titles and URLs are printed in the terminal.
+   - **Free, no key** (the `ddgs` package): the top 5 results with snippets; Yahoo and ddgs's "auto" are asked in parallel and the first to answer wins.
+2. **Quick answer first:** the AI answers from the search results alone (Tavily's answer rephrased, or the snippets) in 1 or 2 spoken sentences, with the date for time-sensitive facts, streamed sentence by sentence. If the question leaves something out ("which match?"), it names the one it found.
+3. Only if the results don't answer it (or for "tell me more") are the top 3 pages read in parallel (4 s each; PDFs and paywalled sites are skipped), their main text extracted with trafilatura, trimmed to about 1,500 words, and the AI asked again with the rule "answer ONLY from these". It says "I couldn't find a reliable answer" only when the pages don't answer either. Hindi or Hinglish questions get Hinglish answers in Roman letters.
+4. The answer and the numbered source titles and URLs are printed in the terminal.
 
-Searching and reading has an 8-second budget (`SEARCH_BUDGET`): pages that haven't loaded by then are replaced by their search snippets. Results are cached for 30 minutes (`SEARCH_CACHE_MINUTES`) in `data/cache.json`. The answer goes through the same AI as chat, so the Gemini backup covers Groq's rate limits. On this laptop a web answer takes about 6 to 12 seconds.
+The search has an 8-second budget (`SEARCH_BUDGET`). Results are cached for 30 minutes (`SEARCH_CACHE_MINUTES`) in `data/cache.json`. The answer goes through the same AI as chat, so the Gemini backup covers Groq's rate limits. `python main.py --timing` adds `web search`, `page reading`, `AI to first sentence` and `first answer sentence ready` to each turn's line.
+
+Speed on this laptop (free ddgs, no Tavily key), first answer sentence: about 2 to 5 s typically (it was 9 to 13 s before the quick-answer path). It's slower when Yahoo drops the connection (ddgs "auto" then takes 2 to 5 s) or when Groq's Qwen model has one of its occasional 2 to 4 s first-token pauses (`openai/gpt-oss-20b` measured a steadier 0.2 to 0.6 s), and about 4 s more when the pages have to be read.
 
 Limits: sites that draw their numbers with JavaScript (live scores, stock tickers) often give no readable text, and then Jarvis says it couldn't find a reliable answer. It can only be as current as the pages the search returns.
 - "News", "news about cricket", "tech news"
@@ -287,7 +290,7 @@ jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_f
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")
 jarvis/skills/
     __init__.py         imports skills IN ORDER: general, notes, gmail, calendar, spotify, browse, system,
-                        web, whatsapp, vscode, apps, weather, aqi, knowledge, ai
+                        web, whatsapp, vscode, apps, weather, aqi, web_questions, knowledge, ai
     general.py          exit, sleep, help, greetings, time, date, calculator, jokes
     notes.py            notes file, reminders, timers
     gmail.py            unread count, read/search email, drafts only; "connect google"
@@ -296,7 +299,8 @@ jarvis/skills/
     briefing.py         good morning briefing (parallel sections, 40 s budget, BRIEFING_TIME), good night
     system.py           volume, media, brightness, screenshot, battery, status, lock, power
     web.py              YouTube, Google News
-    browse.py           web search answered by voice: search, read pages, answer from sources
+    browse.py           web search answered by voice: search, quick answer from the results, pages if needed
+    web_questions.py    regex fast path to browse for obvious web questions (no AI routing call)
     whatsapp.py         WhatsApp messages, calls, contacts (data/contacts.json)
     vscode.py           project registry, open in VS Code, git status/pull, run dev servers
     apps.py             open / close apps and websites
