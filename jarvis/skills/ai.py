@@ -15,6 +15,31 @@ from jarvis.router import fallback, on_startup, skill
 log = logging.getLogger(__name__)
 
 MAX_TURNS = 10  # chat memory, separate from the routing context (3 turns)
+HISTORY_TOKENS = 600  # ...sent within about this many tokens; older turns become one summary line
+CHAT_SKILLS = ("ai", "chat follow-up", "chat direct", "offer", "feeling")
+
+
+def _tokens(text):
+    return len(text) // 4 + 1  # rough: about 4 characters a token
+
+
+def compact_history(history, budget=HISTORY_TOKENS):
+    """(recent messages that fit in `budget` tokens, one-line summary of the older ones or "").
+
+    The newest exchanges are sent whole; older ones are folded into "Earlier: you talked about X; Y", so a long
+    chat doesn't eat Groq's per-minute token budget."""
+    kept, used = [], 0
+    pairs = [history[i:i + 2] for i in range(0, len(history), 2)]
+    for pair in reversed(pairs):
+        cost = sum(_tokens(m["content"]) for m in pair)
+        if used + cost > budget and kept:
+            break
+        kept[:0] = pair
+        used += cost
+    older = history[:len(history) - len(kept)]
+    topics = [" ".join(m["content"].split()[:8]) for m in older if m["role"] == "user"]
+    summary = ("Earlier in this chat the user talked about: " + "; ".join(topics))[:300] if topics else ""
+    return kept, summary
 
 
 def system_prompt():
@@ -564,11 +589,31 @@ _FOLLOW_UP = (r"^(?:aur|aur\?|aur batao|aur bata|aur bataiye|aur kuch|phir|phir 
               r"explain (?:it |that )?(?:in detail|more)|tell me more|aur detail mein)\??$")
 
 
+# Obvious chat skips the routing call too (it would only answer with "reply"): opinions, advice, explanations,
+# how you feel, health worries, "tu kaisa hai". Greetings, jokes and simple feelings have their own skills.
+_DIRECT = (r"\b(?:tu|tum|aap)\s+kya\s+soch\w*", r"\bwhat do you think\b", r"\byour (?:opinion|take|view)\b",
+           r"^(?:should i|kya main|kya mujhe|mujhe kya karna)\b", r"^(?:explain|samjhao|samjha do)\b",
+           r"\b(?:explain karo|explain kar do)\b", r"\b(?:advice|tips? for|suggest(?:ion)?s? for|kya karun|kya karoon)\b",
+           r"^(?:tu|tum|aap)\s+(?:kaisa|kaisi|kaise)\b", r"^(?:kya haal|kya chal raha|what'?s up|sup)\b",
+           r"\b(?:neend nahi|can'?t sleep|cannot sleep|insomnia|sar ?dard|headache|dard ho|pain|bukhar|fever|"
+           r"khansi|cough|feel(?:ing)? (?:really )?(?:low|sick|unwell|anxious|lonely)|akel[ai] (?:feel|lag)|"
+           r"mann nahi lag)\b")
+
+
+@skill("chat direct", *_DIRECT, category="general", help=["tu kya sochta hai", "explain recursion simply",
+                                                           "mujhe neend nahi aa rahi"])
+def chat_direct(ctx, command, match):
+    """Obvious chat goes straight to the chat AI: one AI call instead of two, and the full good-friend rules."""
+    if not config.AI_API_KEY:
+        return None
+    return ai(ctx, command)
+
+
 @skill("chat follow-up", *_FOLLOW_UP, category="general", help=["aur?", "kyun?", "detail mein bata"])
 def chat_follow_up(ctx, command, match):
     """"aur?", "kyun?", "detail mein bata" right after a chat answer: the chat AI, which remembers 10 turns."""
     turns = ctx.state.get("turns") or []
-    if not ctx.state.get("ai_history") or not turns or turns[-1]["skill"] not in ("ai", "chat follow-up", "offer"):
+    if not ctx.state.get("ai_history") or not turns or turns[-1]["skill"] not in CHAT_SKILLS:
         return None  # nothing to follow up on: routing decides
     return ai(ctx, command)
 
@@ -590,9 +635,14 @@ def ai(ctx, command, match=None):
     if ctx.state.pop("ai_down", None) == command:
         return persona.line("ai_down")  # the AI router just tried both for this command: don't make the user wait
     history = ctx.state.setdefault("ai_history", [])
+    recent, summary = compact_history(history)
+    system = system_prompt() + (f" {summary}." if summary else "")
+    from jarvis import timing
+
+    timing.add_tokens("chat", _tokens(system) + sum(_tokens(m["content"]) for m in recent) + _tokens(command), True)
     spoken = []
     try:
-        status, chunks = stream(system_prompt(), history, command, max_tokens_for(command))
+        status, chunks = stream(system, recent, command, max_tokens_for(command))
         if status >= 400:
             log.warning("[ai] HTTP %s: %s", status, chunks[:300])
             if is_retired(status, chunks):

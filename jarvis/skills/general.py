@@ -77,6 +77,9 @@ SHORT_HELP = (
 )
 
 
+# Never in the help list: the crisis response is there when it's needed, not advertised.
+NOT_LISTED = {"crisis"}
+
 # Housekeeping skills: listed in the printed help, but not worth speaking as examples.
 NOT_SPOKEN = {"exit", "sleep", "help", "help category", "greet", "who are you", "how are you", "thanks",
               "forget conversation", "connect google", "disconnect google", "connect spotify"}
@@ -226,6 +229,19 @@ _FEELING = (r"\b(?:i'?m|i am|feeling|feel)\s+(?:so\s+|very\s+|really\s+|a bit\s+
             r"bahut khush|maza aa (?:gaya|raha)|bhook?h lagi)\b")
 
 
+_CRISIS = (r"\b(?:kill myself|killing myself|end my life|end it all|suicid\w*|want to die|wanna die|don'?t want to "
+           r"(?:live|be alive|exist)|no reason to live|better off dead|hurt myself|harm myself|self[- ]harm|"
+           r"cut myself)\b",
+           r"\b(?:marna chah(?:ti|ta) hoon|mar jaana chah(?:ti|ta)|mar jaun|mar jaaun|jeena nahi chah(?:ti|ta)|"
+           r"jeene ka mann nahi|zindagi khatam|khud ko khatam|apne aap ko khatam|khudkushi|aatmhatya)\b")
+
+
+@skill("crisis", *_CRISIS, category="general")
+def crisis(ctx, command, match):
+    """Someone says they want to die or hurt themselves: care and the Tele-MANAS helpline, always, AI or not."""
+    return persona.line("crisis")
+
+
 _NOT_A_MOOD = re.compile(r"\b(?:low|down|great|happy)\s+(?:on|to|at|with|of|about|for)\b")
 
 
@@ -237,7 +253,12 @@ def feeling(ctx, command, match):
     mood = persona.feeling(command)
     if mood is None or len(command.split()) > 12:  # a long sentence is probably asking something: the AI
         return None
+    if mood in ("sad", "stressed") and config.AI_API_KEY:
+        from jarvis.skills import ai  # low mood: a real, caring conversation (the chat AI's good-friend rules)
+
+        return ai.ai(ctx, command)
     return persona.line("feel_" + mood)
+
 
 
 @skill("professional mode", r"^(?:please\s+)?(?:talk|speak|be)\s+(?:more\s+)?(?:professional(?:ly)?|formal(?:ly)?)$",

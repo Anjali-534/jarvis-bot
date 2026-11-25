@@ -74,7 +74,8 @@ def test_hinglish_volume(ai_router, laptop, caplog):
     body = ai_router.requests[0]["payload"]
     assert body["tool_choice"] == "required" and body["model"] == "qwen/qwen3.8-27b"  # a skill, or "reply"
     assert ai_router.requests[0]["timeout"] == 4.0
-    assert {t["function"]["name"] for t in body["tools"]} >= {"volume", "reminder", "whatsapp_message", "air_quality"}
+    sent = {t["function"]["name"] for t in body["tools"]}
+    assert {"volume", "web_search", "reply"} <= sent and len(sent) <= 6  # the shortlist, not every tool
 
 
 def test_cant_hear_anything(ai_router, laptop):
@@ -194,10 +195,10 @@ def test_fun_fact_is_plain_chat(ai_router):
 def test_reply_tool_is_plain_chat(ai_router):
     ai_router.append(tool_call("reply", text="Main bilkul theek hoon. Aap batao, kya haal hai?"))
     ctx = make_ctx()
-    assert handle(ctx, "tum kaise ho yaar") == "ai"
+    assert handle(ctx, "tumhara favourite colour kaunsa hai") == "ai"
     assert ctx.voice.said == ["Main bilkul theek hoon.", "Aap batao, kya haal hai?"]
     names = [t["function"]["name"] for t in ai_router.requests[0]["payload"]["tools"]]
-    assert names[-3:] == ["reply", "cant_do", "clarify"]
+    assert names[-1] == "reply"
 
 
 # ---------------------------------------------------------------- follow-ups
@@ -379,4 +380,6 @@ def test_gemini_function_declarations_and_call(monkeypatch, laptop):
     declarations = {d["name"]: d for d in body["tools"][0]["functionDeclarations"]}
     assert declarations["volume"]["parameters"]["properties"]["direction"]["type"] == "STRING"
     assert declarations["volume"]["parameters"]["required"] == ["direction"]
-    assert "required" not in declarations["air_quality"]["parameters"]  # all-optional: no empty "required"
+    assert set(declarations) <= {"volume", "media", "web_search", "reply", "play"}  # the shortlist
+    assert "required" not in intent.gemini_tools()[0]["functionDeclarations"][
+        [d["name"] for d in intent.gemini_tools()[0]["functionDeclarations"]].index("air_quality")]["parameters"]

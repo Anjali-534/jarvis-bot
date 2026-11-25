@@ -487,7 +487,7 @@ def test_short_help_prints_full_list(caplog):
 def test_every_skill_has_category_and_examples():
     for sk in router.SKILLS:
         assert sk.category in general.CATEGORIES, sk.name
-        assert sk.examples, sk.name
+        assert sk.examples or sk.name in general.NOT_LISTED, sk.name
     for key in general.CATEGORIES:
         assert 4 <= len(general.examples_for(key, limit=6, spoken=True)) <= 6, key
 

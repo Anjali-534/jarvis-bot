@@ -45,12 +45,12 @@ def test_b_questions_get_a_friendly_answer(ai_router, friend):
     ai_router.append(tool_call("reply", text="Haan yaar, MBA tab karna jab goal clear ho. Pehle 2 saal kaam kar le, "
                                              "phir decide kar."))
     ctx = make_ctx()
-    assert handle(ctx, "tu kya sochta hai, mujhe mba karna chahiye") == "ai"
+    assert handle(ctx, "mba ke baare mein bata, karun ya nahi") == "ai"
     assert ctx.voice.said == ["Haan yaar, MBA tab karna jab goal clear ho.", "Pehle 2 saal kaam kar le, phir decide kar."]
     rules = routing_prompt(ai_router)
-    assert "3) General knowledge, explanations, advice, opinions" in rules
+    assert "3) Knowledge, advice, opinions, maths, coding, chat: reply" in rules
     assert "close Delhi friend" in rules and "real opinions with reasons" in rules
-    assert "doctor/CA se confirm kar lena" in rules and "never make up facts" in rules
+    assert "CA/lawyer se confirm kar lena" in rules and "never make up facts" in rules
     assert "Pakka nahi pata yaar" in rules  # says so plainly when it doesn't know
     assert ctx.state["ai_history"][-1]["content"].startswith("Haan yaar, MBA")  # remembered for follow-ups
 
@@ -81,7 +81,8 @@ def test_c_only_harmless_alternatives_are_kept(ai_router, friend):
     ai_router.append(tool_call("cant_do", text="Yeh nahi hoga, laptop band kar doon?", alternative="shut down the laptop"))
     ctx = make_ctx()
     handle(ctx, "make my laptop fly")
-    assert "offer" not in ctx.state  # power off is never a one-word "haan" away
+    assert ctx.state["offer"] == "show me make my laptop fly on google"  # power off is never a one-word "haan"
+    assert "shut" not in ctx.state["offer"]                              # away: Google is offered instead
     assert intent.safe_alternative("search the web for pizza near me") == "search the web for pizza near me"
     assert intent.safe_alternative("close chrome") is None
 
@@ -160,12 +161,12 @@ def test_follow_ups_go_to_chat_with_the_conversation(chat, friend):
 
 
 def test_detail_requests_get_a_longer_answer(chat, friend):
-    chat["router"].append(tool_call("reply", text="Recursion matlab function khud ko call karta hai."))
+    chat["answers"] += ["Recursion matlab function khud ko call karta hai.",
+                        "Socho ek Russian doll ke andar choti doll hai..."]
     ctx = make_ctx()
-    handle(ctx, "explain recursion simply")
-    chat["answers"].append("Socho ek Russian doll ke andar choti doll hai...")
+    assert handle(ctx, "explain recursion simply") == "chat direct"  # obvious chat: no routing call
     assert handle(ctx, "detail mein bata") == "chat follow-up"
-    assert chat["sent"][0]["max_tokens"] == ai.DETAIL_TOKENS
+    assert chat["sent"][1]["max_tokens"] == ai.DETAIL_TOKENS and chat["router"].requests == []
 
 
 def test_aur_after_a_web_answer_reads_more_from_the_same_sources(friend, monkeypatch):
@@ -210,8 +211,8 @@ def test_language_rule_in_every_prompt(ai_router, friend):  # noqa: F811
     rule = "English question -> English answer; Hinglish -> Hinglish; Hindi (Devanagari) -> Hinglish"
     assert rule in ai.system_prompt() and rule in persona.ai_style()
     ai_router.append(tool_call("reply", text="Sure! Recursion is a function calling itself."))
-    handle(make_ctx(), "explain recursion simply")
-    assert rule in routing_prompt(ai_router)
+    handle(make_ctx(), "what's a good name for a cat")
+    assert "match their language (English, or Hinglish in Roman letters)" in routing_prompt(ai_router)
     from jarvis.skills import browse as b
 
     system, _ = b.answer_prompt("aaj sona kitne ka hai", {"query": "q", "at": "now", "provider": "ddgs",
@@ -221,14 +222,15 @@ def test_language_rule_in_every_prompt(ai_router, friend):  # noqa: F811
 
 
 # ---------------------------------------------------------------- Hindi genders
-_GENDERED = re.compile(r"\b(?:gaya|gayi|gai|raha|rahi|kaisa|kaisi|sakta|sakti|dunga|dungi|karta|karti|dekhta|dekhti|"
+_GENDERED = re.compile(r"\b(?:akela|akeli|gaya|gayi|gai|raha|rahi|kaisa|kaisi|sakta|sakti|dunga|dungi|karta|karti|dekhta|dekhti|"
                        r"leta|leti|deta|deti|sunta|sunti|jaunga|jaungi|jaata|jaati|thaka|thaki|paya|payi|aaya|aayi|"
                        r"soya|soyi|samjha|samjhi|hua|hui|gaye|lagi|laga)\b(?!\{)",  # laga{ta}: a placeholder
                        re.IGNORECASE)
 # Literal forms whose subject is a thing, not Jarvis or the user ("Shaam ho gayi", "AI jawab nahi de raha")
 _NEUTRAL = re.compile(r"lunch hua|chal raha|din kaisa raha|ho gayi|ho gaya|ho gaye|baj gaye|atak gaya|ho pa raha|"
                       r"ho pa rahi|laga diya|laga doon|haath nahi laga|pareshan kar raha|kya hua|bhookh lagi|"
-                      r"neend nahi aa rahi|jawab nahi de raha|soojh raha", re.IGNORECASE)
+                      r"neend nahi aa rahi|jawab nahi de raha|soojh raha|fikar ho rahi|khayal aa raha",
+                      re.IGNORECASE)
 
 
 def all_templates():

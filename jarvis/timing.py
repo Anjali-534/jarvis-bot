@@ -29,12 +29,17 @@ class Turn:
         self.start = time.perf_counter()
         self.marks = {}       # moments, seconds since the turn started
         self.durations = {}   # accumulated durations
+        self.tokens = {}      # AI input tokens per kind of request: {"routing": (812, False)}; True = estimated
 
     def mark(self, name):
         self.marks.setdefault(name, time.perf_counter() - self.start)
 
     def add(self, name, seconds):
         self.durations[name] = self.durations.get(name, 0.0) + seconds
+
+    def add_tokens(self, kind, count, estimated=False):
+        before, was_estimated = self.tokens.get(kind, (0, False))
+        self.tokens[kind] = (before + count, was_estimated or estimated)
 
     def line(self):
         parts = []
@@ -43,6 +48,8 @@ class Turn:
                 parts.append(f"{label} at {self.marks[key]:.2f}s")
             elif key in self.durations:
                 parts.append(f"{label} {self.durations[key]:.2f}s")
+        for kind, (count, estimated) in self.tokens.items():
+            parts.append(f"{kind} input {'~' if estimated else ''}{count} tokens")
         parts.append(f"total {time.perf_counter() - self.start:.2f}s")
         return "[timing] " + " | ".join(parts)
 
@@ -69,6 +76,12 @@ def mark(name):
 def add(name, seconds):
     if _current:
         _current.add(name, seconds)
+
+
+def add_tokens(kind, count, estimated=False):
+    """AI input tokens for this turn ("routing", "chat", "web answer"), shown by --timing."""
+    if _current:
+        _current.add_tokens(kind, count, estimated)
 
 
 def finish():

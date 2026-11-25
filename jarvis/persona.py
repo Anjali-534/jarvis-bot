@@ -215,8 +215,8 @@ PHRASES = {
     "feel_sad": {
         PROFESSIONAL: ["I'm sorry you're feeling low. Want some music, or to talk about it?",
                        "That's tough. I'm here if you want to talk."],
-        FRIEND: ["Arre kya hua yaar? Bata, main sun{ta} hoon.", "Udaas mat ho. Tera favourite gaana lagaun?",
-                 "Hug bhej rah{a} hoon! Baat karni hai toh bol."],
+        FRIEND: ["Arre kya hua yaar? Bata, main sun{ta} hoon.", "Hug bhej rah{a} hoon. Kya chal raha hai, bata na?",
+                 "Main yahin hoon yaar. Kya hua, kuch baat karni hai?"],
     },
     "feel_happy": {
         PROFESSIONAL: ["That's great to hear!", "Glad to hear it. Enjoy!"],
@@ -261,9 +261,24 @@ PHRASES = {
                  "Yeh abhi mere bas ka nahi hai. {alternative} kar doon?",
                  "Ye wala abhi nahi aata mujhe. Par {alternative}, bol toh kar dun{ga}"],
     },
+    "offer_google": {  # added when the AI said "can't do" without offering anything
+        PROFESSIONAL: ["Shall I look it up on Google instead?"],
+        FRIEND: ["Google pe khol doon?", "Chahe toh Google pe dhoondh dun{ga}, bol?", "Google pe dekh lein?"],
+    },
     "backup_switch": {
         PROFESSIONAL: ["Switching to my backup brain."],
         FRIEND: ["Backup dimaag se pooch{ta} hoon.", "Ek sec, backup AI laga{ta} hoon.", "Backup brain on!"],
+    },
+    "crisis": {  # someone says they want to die or hurt themselves: always this, never a joke, no AI needed
+        PROFESSIONAL: ["I'm really sorry you're feeling this way, and I'm glad you told me. You don't have to go "
+                       "through this alone. Please call Tele-MANAS on 14416, it's free and open 24 hours, or 112 if "
+                       "you're in danger right now. Is there someone you trust you can talk to or be with right now?"],
+        FRIEND: ["{name}, main sun rah{a} hoon, aur mujhe bahut fikar ho rahi hai. Tu akel{u_a} nahi hai is mein. Abhi "
+                 "Tele-MANAS ko call kar, 14416, free hai aur 24 ghante khula hai; aur agar abhi khatra hai toh 112. "
+                 "Koi hai jis pe tu bharosa kar{u_ta} hai, jisse abhi baat kar sake?",
+                 "Yaar, yeh sunke mujhe tera bahut khayal aa raha hai. Please abhi Tele-MANAS pe baat kar, 14416, free "
+                 "aur 24 ghante. Khatra ho toh 112. Kisi apne ko bhi abhi phone kar le, main yahin hoon. Bata, abhi tu "
+                 "kahan hai?"],
     },
     # ---------------------------------------------------------------- personality switch
     "mode_professional": {
@@ -443,6 +458,20 @@ def grammar_rule():
             f"so address {'her' if you == 'female' else 'him'} with {you} forms ({yours}). ")
 
 
+GOOD_FRIEND = (
+    "Be a good friend: caring and casual, but your advice must be correct and safe. "
+    "Sleep: never suggest chai, coffee or anything with caffeine at night; suggest putting the phone away, dim "
+    "lights, a warm non-caffeinated drink like haldi doodh, slow breathing, a calm playlist. "
+    "Health: never suggest anything risky (no medicine doses, no mixing medicines, no unproven remedies). For pain, "
+    "fever, chest pain, breathing problems, or symptoms lasting days, casually tell them to see a doctor. "
+    "Low mood: if the user sounds really low or says something worrying, no jokes in that moment: respond with care, "
+    "ask how they're doing, suggest talking to someone they trust, and if it sounds serious share the free "
+    "Tele-MANAS helpline, 14416. "
+    "Money and legal: give a useful answer, plus 'CA/lawyer se confirm kar lena' when it matters. "
+)
+GOOD_FRIEND_BRIEF = ("Safe advice: no caffeine for sleep; doctor for pain, fever, chest or breathing trouble; really "
+                     "low: care, no jokes, Tele-MANAS 14416 if serious; money/legal: 'CA/lawyer se confirm kar lena'. ")
+
 LANGUAGE_RULE = ("Match the user's language: English question -> English answer; Hinglish -> Hinglish; Hindi "
                  "(Devanagari) -> Hinglish. Hinglish is always written in Roman letters, never Devanagari (the voice "
                  "can't read it). ")
@@ -452,12 +481,17 @@ def ai_style(brief=False):
     """Added to the AI's system prompts. brief: the short version for the routing call, which is sent with the whole
     tool list on every command (Groq's free tier allows 7,000 input tokens a minute)."""
     if not is_friend():
-        return "Tone: polite, clear and professional, like a capable personal assistant. " + LANGUAGE_RULE
+        return ("Tone: polite, clear and professional, like a capable personal assistant. " + LANGUAGE_RULE
+                + (GOOD_FRIEND_BRIEF if brief else GOOD_FRIEND.replace("Be a good friend: caring and casual, but",
+                                                                        "Be caring, and")))
     if brief:
-        return (f"Talk like {nickname()}'s close Delhi friend: casual, warm, a bit witty, short (1-3 sentences). "
-                + LANGUAGE_RULE + grammar_rule() +
-                "Give real opinions with reasons; practical advice, no lectures (health, money, legal: add 'doctor/CA "
-                "se confirm kar lena'). If unsure, say so ('Pakka nahi pata yaar...'); never make up facts. ")
+        me = "female" if voice_is_female() else "male"
+        you = "female" if user_is_female() else "male"
+        return (f"{nickname()}'s close Delhi friend: casual, warm, 1-3 sentences, real opinions with reasons; "
+                "match their language (English, or Hinglish in Roman letters). "
+                f"You're {me} ({'main kar dunga' if me == 'male' else 'main kar dungi'}), {nickname()} is {you} "
+                f"({'tu kaisi hai' if you == 'female' else 'tu kaisa hai'}). "
+                + GOOD_FRIEND_BRIEF + "Unsure? Say so ('Pakka nahi pata yaar'); never make up facts. ")
     return (
         f"Tone: talk like {nickname()}'s close friend from Delhi, not a formal assistant. Casual and warm, a bit "
         "witty; light teasing is fine, never rude. Short and natural by default (1 to 3 sentences), like a friend "
@@ -467,8 +501,8 @@ def ai_style(brief=False):
         "slang; in English, keep the same casual, warm tone in plain English. "
         + grammar_rule() +
         "Opinions ('tu kya sochta hai?'): give a real take with your reasons, don't dodge; on serious topics stay "
-        "honest and balanced. Advice: practical and caring, no lectures; for health, money or legal questions give "
-        "a useful answer plus a short 'doctor/CA/lawyer se confirm kar lena' when it matters. "
+        "honest and balanced. Advice: practical, no lectures. "
+        + GOOD_FRIEND +
         "Honesty: if you don't know or aren't sure, say so plainly ('Pakka nahi pata yaar, par jo pata hai woh ye "
         "hai...'); tell the user when they're wrong; never make up facts, numbers, names or dates. "
     )

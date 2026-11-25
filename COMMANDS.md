@@ -160,7 +160,8 @@ Jarvis talks like a close friend by default (casual Hinglish: "Ho gaya!", "Kya b
 - "Tell me a joke" / "who are you" / "how are you" / "thank you"
 - Anything else goes to the AI, which answers like a friend: "tu kaisa hai", "mujhe neend nahi aa rahi", "explain recursion simply", "tu kya sochta hai, mujhe MBA karna chahiye?", "kaunsa better hai iPhone ya Pixel"
 - Follow-ups: "aur?", "kyun?", "uska kya?", "explain karo" / "detail mein bata" (a longer answer)
-- Things it can't do yet get an alternative: "order me a pizza" -> "Swiggy khol doon?", then "haan" opens it (or "nahi")
+- Things it can't do yet get an alternative: "order me a pizza" -> "Swiggy khol doon?", then "haan" opens it (or "nahi"). If nothing closer fits, it offers Google.
+- Sensible advice: "mujhe neend nahi aa rahi", "sar dard ho raha hai", "kya main saara paisa crypto mein daal doon?" get safe, practical answers (doctor or CA when it matters). If you're feeling really low, it's there for you, and the free Tele-MANAS helpline is 14416.
 - Unclear questions get one short question back ("Kaunsa match? India wala?")
 - "Forget our conversation" (clears the AI's memory)
 - "Which AI model are you using" (if a model is retired, Jarvis switches to a newer one by itself and tells you once; it also says whether the Gemini backup is in use)

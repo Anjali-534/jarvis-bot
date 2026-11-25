@@ -14,13 +14,19 @@ Anything that isn't a skill is never a dead end. The AI must call one tool:
   d) too unclear to act on                       -> clarify: ONE short question, like a friend would ask
 The last 3 turns are sent along so follow-ups work: "what about Noida?", "and tomorrow?". Chat follow-ups
 ("aur?", "kyun?") go straight to the chat AI with its own 10-turn memory (skills/ai.py).
+
+Two-stage routing keeps each call small (Groq's free tier allows 7,000 input tokens a minute): a local
+pre-filter (keywords, Hinglish synonyms, fuzzy matching against each skill's name, examples and parameters)
+picks the 5 likeliest tools, and only those go to the AI, with web_search, the previous turn's tool and the
+reply / cant_do / clarify tools. About 800 input tokens per routed question instead of 2,500.
 """
+import difflib
 import json
 import logging
 import re
 
 import config
-from jarvis import http, persona
+from jarvis import http, persona, timing
 
 log = logging.getLogger(__name__)
 
@@ -31,25 +37,16 @@ TYPES = {"string": "string", "integer": "integer", "number": "number", "boolean"
 MAX_ARG = 200
 
 RULES = (
-    "Call exactly ONE tool for every message. Never say you can't help without offering something.\n"
-    "1) Actions a tool does (volume, music, apps, reminders, timers, notes, weather, air quality, WhatsApp, email, "
-    "calendar, laptop power): call that tool. Tool arguments are plain English: translate Hindi/Hinglish ('kal subah "
-    "9 baje' = 'tomorrow at 9 am'). Reminder times: 'in 10 minutes', 'at 6 pm', 'tomorrow at 9 am'. Follow-ups "
-    "('what about Noida?', 'and tomorrow?', 'make it 5 minutes instead', 'send the same to Riya') reuse the previous "
-    "turn's command with the changed argument. Music: leave platform out unless the user names Spotify. Keep the "
-    "user's own words for message texts.\n"
-    "2) NEVER state live data yourself (weather, temperature, air quality, news, calendar, email): call the tool. "
-    "Use web_search for current events, prices, scores, match results, 'latest' or 'today' questions, who holds a "
-    "role now, people, places, products and events whose facts may have changed, 'is X still...', and anything "
-    "after your training data; not for maths, jokes, chat, advice or settled facts.\n"
-    "3) General knowledge, explanations, advice, opinions, maths, coding, life questions, jokes and chat: call "
-    "reply with your spoken answer (plain speech, no markdown).\n"
-    "4) An action no tool does (order food, book a cab, pay a bill, make a phone call...): call cant_do: say "
-    "casually that you can't do it yet and offer the closest thing you CAN do, given as alternative (a command like "
-    "'open swiggy', 'search the web for pizza places near me', 'show me pizza delivery on google', 'play lofi').\n"
-    "5) Too unclear to act on or answer ('who won the match?' with no hint which): call clarify with ONE short "
-    "question, the way a friend would ask ('Kaunsa match? India wala?'). Don't over-ask: if a sensible guess "
-    "exists, act on it."
+    "Call exactly ONE tool.\n"
+    "1) Actions: that tool, arguments in plain English ('kal subah 9 baje' = 'tomorrow at 9 am'); follow-ups "
+    "('what about Noida?', 'make it 5 minutes instead') reuse the last command with the change; music: no platform "
+    "unless Spotify is named; reminder/note text in short English, but WhatsApp/email texts in the user's own words.\n"
+    "2) Never state live data yourself. Use web_search for current events, prices, scores, people, places, "
+    "'is X still...' and anything after your training data.\n"
+    "3) Knowledge, advice, opinions, maths, coding, chat: reply (spoken, no markdown).\n"
+    "4) An action no tool does (order food, book a cab): reply kind=cant_do, offering the closest thing as "
+    "alternative ('open swiggy', 'search the web for ...').\n"
+    "5) Too unclear: reply kind=clarify, ONE short question ('Kaunsa match? India wala?')."
 )
 
 
@@ -103,28 +100,120 @@ def tools():
 # The model must always call a tool: a skill, or "reply" for chat. Forcing an explicit choice stops it from
 # answering live-data questions from memory ("Noida ka AQI abhi 142 hai") instead of calling air_quality.
 REPLY_TOOL = "reply"
-REPLY_SCHEMA = {"type": "object", "properties": {"text": {
-    "type": "string", "description": "your short spoken answer, for chat, questions and facts (never live data)"}},
+# One small tool covers answers, "can't do" offers and clarifying questions: every tool definition costs ~115
+# input tokens on Groq, and this one goes with every routed question.
+REPLY_SCHEMA = {"type": "object", "properties": {
+    "text": {"type": "string", "description": "what to say"},
+    "kind": {"type": "string", "enum": ["answer", "cant_do", "clarify"]},
+    "alternative": {"type": "string", "description": "cant_do: command to offer, e.g. open swiggy"}},
     "required": ["text"]}
-CANT_DO_TOOL = "cant_do"
-CANT_DO_SCHEMA = {"type": "object", "properties": {
-    "text": {"type": "string", "description": "casually say you can't do that yet and offer the alternative, "
-                                              "ending with a short question"},
-    "alternative": {"type": "string", "description": "a command you CAN run instead, e.g. 'open swiggy', "
-                                                     "'search the web for ...', 'show me ... on google'"}},
-    "required": ["text", "alternative"]}
-CLARIFY_TOOL = "clarify"
-CLARIFY_SCHEMA = {"type": "object", "properties": {"question": {
-    "type": "string", "description": "ONE short clarifying question, like a friend would ask"}}, "required": ["question"]}
-EXTRA_TOOLS = [
-    (REPLY_TOOL, "answer the user without doing anything", REPLY_SCHEMA),
-    (CANT_DO_TOOL, "an action you have no tool for: say so and offer the closest thing you can do", CANT_DO_SCHEMA),
-    (CLARIFY_TOOL, "ask one short question when the request is too unclear", CLARIFY_SCHEMA),
-]
+CANT_DO_TOOL, CLARIFY_TOOL = "cant_do", "clarify"  # older names, still understood
+EXTRA_TOOLS = [(REPLY_TOOL, "speak: answer, cant_do or clarify", REPLY_SCHEMA)]
 
 
-def openai_tools():
-    skills = [{"type": "function", "function": {"name": n, "description": d, "parameters": s}} for n, d, s, _ in tools()]
+# ---------------------------------------------------------------- stage 1: the local pre-filter
+SHORTLIST = 3           # at most this many skill tools go to the AI (plus web_search and the previous turn's)
+KEEP_RATIO = 0.5        # ...and only those scoring at least half as well as the best match
+ALWAYS = ("web_search",)
+# Hinglish and everyday words -> words found in the skills' names, examples and parameters
+SYNONYMS = {
+    "awaaz": "volume", "aawaz": "volume", "awaz": "volume", "sound": "volume", "loud": "volume", "louder": "volume up",
+    "quiet": "volume down", "dheere": "volume down", "badha": "up increase", "badhao": "up increase",
+    "kam": "down decrease", "ghata": "down", "ghatao": "down", "mute": "mute volume",
+    "gaana": "play song music", "gaane": "play song music", "song": "play music", "songs": "play music",
+    "bajao": "play", "chalao": "play open", "sunao": "play", "music": "play", "playlist": "playlist spotify",
+    "kholo": "open", "khol": "open", "launch": "open", "band": "close shut", "bandh": "close shut",
+    "yaad": "remind reminder", "dila": "remind", "dilana": "remind", "remind": "reminder", "alarm": "reminder timer",
+    "baje": "at", "subah": "morning am", "shaam": "evening pm", "kal": "tomorrow",
+    "mausam": "weather", "barish": "rain weather", "baarish": "rain weather", "garmi": "weather temperature",
+    "thand": "weather temperature", "temperature": "weather", "hawa": "air quality aqi", "pradushan": "pollution aqi",
+    "pollution": "aqi air quality", "smog": "aqi", "mask": "aqi",
+    "message": "whatsapp message send", "msg": "message whatsapp", "bhejo": "send message", "bhej": "send message",
+    "mail": "email", "emails": "email", "inbox": "email",
+    "meeting": "calendar meeting schedule", "meetings": "calendar", "event": "calendar", "schedule": "calendar",
+    "likh": "note write", "likho": "note write", "note": "note", "notes": "note",
+    "roshni": "brightness", "screen": "brightness screenshot", "battery": "battery",
+    "shutdown": "shut down shutdown laptop", "restart": "restart laptop", "lock": "lock laptop",
+    "agla": "next", "agle": "next", "pichla": "previous", "ruko": "pause", "roko": "pause",
+    "project": "project code", "repo": "project pull", "git": "pull project", "code": "code project",
+}
+_STOP = {"the", "a", "an", "to", "for", "of", "in", "on", "at", "and", "or", "is", "it", "me", "my", "i", "you", "please",
+         "can", "could", "do", "kar", "karo", "kardo", "de", "do", "na", "yaar", "thoda", "zara", "ka", "ki", "ke", "ko",
+         "hai", "se", "mein", "par", "pe", "jarvis", "what", "whats", "e", "g", "with", "about", "this", "that"}
+_index = {}
+
+
+def _words(text):
+    return [w for w in re.findall(r"[a-z0-9]+", (text or "").lower()) if w not in _STOP and len(w) > 1]
+
+
+def _doc_words(sk):
+    """Words describing a skill tool: its names, examples and parameter descriptions (and its also= skills')."""
+    from jarvis import router
+
+    parts = [sk.name, sk.tool or "", *sk.examples]
+    for key, spec in (sk.params or {}).items():
+        parts += [key.rstrip("?"), " ".join(spec) if isinstance(spec, (list, tuple)) else str(spec)]
+    for other in router.SKILLS:
+        if other.name in sk.also:
+            parts += [other.name, *other.examples]
+    return set(_words(" ".join(parts)))
+
+
+def _tool_index():
+    """{tool name: words}, and how many tools each word appears in (rare words count more)."""
+    key = tuple(name for name, *_ in tools())
+    if _index.get("key") != key:
+        docs = {name: _doc_words(sk) for name, _, _, sk in tools()}
+        frequency = {}
+        for words in docs.values():
+            for w in words:
+                frequency[w] = frequency.get(w, 0) + 1
+        _index.update(key=key, docs=docs, frequency=frequency, vocabulary=sorted(frequency))
+    return _index
+
+
+def shortlist(ctx, command, limit=SHORTLIST):
+    """Stage 1: the tool names most likely to be needed for `command`, scored locally (no AI)."""
+    index = _tool_index()
+    said = set(_words(command))
+    for w in list(said):
+        said.update(_words(SYNONYMS.get(w, "")))
+    fuzzy = {}
+    for w in said:
+        if len(w) >= 4 and w not in index["frequency"]:
+            for close in difflib.get_close_matches(w, index["vocabulary"], n=2, cutoff=0.84):
+                fuzzy[close] = 0.6  # "reminde", "whatsap", "brightnes"
+    scores = {}
+    for name, words in index["docs"].items():
+        score = sum(1.0 / index["frequency"][w] for w in said & words)
+        score += sum(weight / index["frequency"][w] for w, weight in fuzzy.items() if w in words)
+        if score > 0:
+            scores[name] = score
+    ranked = sorted(scores, key=lambda n: -scores[n])
+    picked = [n for n in ranked[:limit] if scores[n] >= KEEP_RATIO * scores[ranked[0]]]
+    previous = _previous_tool(ctx)
+    for name in (*ALWAYS, previous):
+        if name and name not in picked and name in index["docs"]:
+            picked.append(name)
+    return picked
+
+
+def _previous_tool(ctx):
+    """The tool behind the last turn, so "make it 5 minutes instead" can reuse it."""
+    turns = ctx.state.get("turns") or [] if ctx is not None else []
+    if not turns:
+        return None
+    last = turns[-1]["skill"]
+    for name, _, _, sk in tools():
+        if last == sk.name or last in sk.also:
+            return name
+    return None
+
+
+def openai_tools(names=None):
+    skills = [{"type": "function", "function": {"name": n, "description": d, "parameters": s}}
+              for n, d, s, _ in tools() if names is None or n in names]
     return skills + [{"type": "function", "function": {"name": n, "description": d, "parameters": s}}
                      for n, d, s in EXTRA_TOOLS]
 
@@ -133,6 +222,11 @@ def _decision(name, args):
     args = args if isinstance(args, dict) else {}
     if name == REPLY_TOOL:
         text = str(args.get("text", "")).strip()
+        kind = str(args.get("kind") or "answer").lower()
+        if kind == "cant_do":
+            return ("offer", text, str(args.get("alternative", "")).strip())
+        if kind == "clarify" and text:
+            return ("clarify", text)
         return ("text", text) if text else None
     if name == CANT_DO_TOOL:
         return ("offer", str(args.get("text", "")).strip(), str(args.get("alternative", "")).strip())
@@ -151,9 +245,11 @@ def _gemini_schema(value):
     return value
 
 
-def gemini_tools():
+def gemini_tools(names=None):
     declarations = []
     for name, desc, params, _ in tools():
+        if names is not None and name not in names:
+            continue
         decl = {"name": name, "description": desc}
         if params["properties"]:
             decl["parameters"] = _gemini_schema(params)
@@ -234,7 +330,7 @@ def _context(ctx):
     return "\n".join(lines)
 
 
-CHAT_SKILLS = {"ai", "chat follow-up", "offer"}
+CHAT_SKILLS = {"ai", "chat follow-up", "chat direct", "offer", "feeling"}
 
 
 def system_text(ctx):
@@ -242,9 +338,9 @@ def system_text(ctx):
     from datetime import datetime
 
     recent = _context(ctx)
-    me = (f"You are {config.ASSISTANT_NAME}, the voice assistant on {config.USER_NAME}'s Windows laptop in India. "
-          f"Now: {datetime.now():%A %d %B %Y, %I:%M %p}. ")
-    return (me + RULES + "\nHow you talk in reply, cant_do and clarify: " + persona.ai_style(brief=True)
+    me = (f"You are {config.ASSISTANT_NAME}, voice assistant on {config.USER_NAME}'s laptop in India. "
+          f"Now: {datetime.now():%a %d %b %Y %I:%M %p}. ")
+    return (me + RULES + "\nStyle for reply: " + persona.ai_style(brief=True)
             + (f"\n\nRecent conversation:\n{recent}" if recent else ""))
 
 
@@ -252,12 +348,22 @@ def router_model():
     return config.AI_ROUTER_MODEL or config.AI_MODEL
 
 
+def count_tokens(kind, reported, payload):
+    """Log the request's input tokens (the provider's count, or an estimate) and add them to --timing."""
+    estimated = not reported
+    tokens = reported or len(json.dumps(payload, ensure_ascii=False)) // 4
+    timing.add_tokens(kind, tokens, estimated)
+    log.debug("[tokens] %s input: %s%d", kind, "~" if estimated else "", tokens)
+    return tokens
+
+
 def ask_openai(ctx, command):
     """Returns (status, decision or None) or (status, error body)."""
+    names = shortlist(ctx, command)
     body = {
         "model": router_model(),
         "messages": [{"role": "system", "content": system_text(ctx)}, {"role": "user", "content": command}],
-        "tools": openai_tools(), "tool_choice": "required", "temperature": 0, "max_tokens": 200,
+        "tools": openai_tools(names), "tool_choice": "required", "temperature": 0, "max_tokens": 200,
     }
     if config.AI_REASONING_EFFORT:
         body["reasoning_effort"] = config.AI_REASONING_EFFORT
@@ -265,7 +371,10 @@ def ask_openai(ctx, command):
                               headers={"Authorization": f"Bearer {config.AI_API_KEY}"}, timeout=config.AI_ROUTER_TIMEOUT)
     if response.status_code >= 400:
         return response.status_code, getattr(response, "text", "") or ""
-    message = response.json()["choices"][0]["message"]
+    data = response.json()
+    count_tokens("routing", (data.get("usage") or {}).get("prompt_tokens"), body)
+    log.info("[intent] tools offered: %s", ", ".join(names))
+    message = data["choices"][0]["message"]
     for call in message.get("tool_calls") or []:
         function = call.get("function") or {}
         try:
@@ -284,7 +393,7 @@ def ask_gemini(ctx, command, model=None, key=None, timeout=None):
     body = {
         "systemInstruction": {"parts": [{"text": system_text(ctx)}]},
         "contents": [{"role": "user", "parts": [{"text": command}]}],
-        "tools": gemini_tools(),
+        "tools": gemini_tools(shortlist(ctx, command)),
         "toolConfig": {"functionCallingConfig": {"mode": "ANY"}},  # must call a tool (a skill, or "reply")
         "generationConfig": {"temperature": 0, "maxOutputTokens": 200},
     }
@@ -292,7 +401,9 @@ def ask_gemini(ctx, command, model=None, key=None, timeout=None):
     response = http.post_json(url, body, headers=ai._gemini_headers(key), timeout=timeout or config.AI_ROUTER_TIMEOUT)
     if response.status_code >= 400:
         return response.status_code, getattr(response, "text", "") or ""
-    parts = (((response.json().get("candidates") or [{}])[0].get("content") or {}).get("parts")) or []
+    data = response.json()
+    count_tokens("routing", (data.get("usageMetadata") or {}).get("promptTokenCount"), body)
+    parts = (((data.get("candidates") or [{}])[0].get("content") or {}).get("parts")) or []
     for part in parts:
         if part.get("functionCall"):
             call = part["functionCall"]
@@ -395,6 +506,11 @@ def safe_alternative(command):
 def _offer(ctx, command, text, alternative):
     """c) Can't do it: say so casually, offer the closest thing; "haan" runs it (router.handle)."""
     alternative = safe_alternative(alternative)
+    if not alternative:  # the AI offered nothing usable: never a dead end, offer Google
+        topic = re.sub(r"^(?:please\s+)?(?:can you\s+|could you\s+)?", "", command).strip(" ?.!")
+        alternative = safe_alternative(f"show me {topic} on google")
+        if text and alternative:
+            text = text.rstrip() + " " + persona.line("offer_google")
     if not text:
         text = persona.line("cant_do", alternative=alternative or "Google pe dhoondh")
     handled = _answer(ctx, command, text)
