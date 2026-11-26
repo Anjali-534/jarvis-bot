@@ -249,11 +249,31 @@ def _deliver(ctx, sk, result):
     return sk.name
 
 
+def blocked(ctx, sk):
+    """The message to say instead of running `sk`, when this context may not use it (the phone remote can't type
+    into windows unless TELEGRAM_ALLOW_KEYBOARD is on), else None."""
+    return (ctx.state.get("blocked_modules") or {}).get(sk.module)
+
+
+def must_confirm(ctx, sk):
+    """The phone remote confirms every risky action with buttons, even ones that don't ask on the laptop."""
+    return bool(ctx.state.get("confirm_risky")) and (sk.risky or sk.name in ctx.state.get("confirm_skills", ())) \
+        and not sk.confirms
+
+
 def _try_skills(ctx, command):
     for sk in SKILLS:
         match = next((m for m in (p.search(command) for p in sk.patterns) if m), None)
         if match is None:
             continue
+        refusal = blocked(ctx, sk)
+        if refusal:
+            ctx.say(refusal)
+            return _deliver(ctx, sk, "")
+        if must_confirm(ctx, sk):
+            if not ctx.confirm(f"Do this on the laptop: {command}?"):
+                ctx.say(persona.line("not_done"))
+                return _deliver(ctx, sk, "")
         result = _run(ctx, sk, command, match)
         if result is not None:
             return _deliver(ctx, sk, result)

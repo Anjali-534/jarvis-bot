@@ -40,8 +40,30 @@ def _show(title, message):
         return None
 
 
-def toast(title, message, background=True):
-    """Show a toast if NOTIFY is on. Runs on a background thread so it never blocks a reminder."""
+_phone_forwarders = []  # fn(title, message): the Telegram remote, when TELEGRAM_NOTIFY is on
+
+
+def add_phone_forwarder(fn):
+    if fn not in _phone_forwarders:
+        _phone_forwarders.append(fn)
+
+
+def remove_phone_forwarder(fn):
+    if fn in _phone_forwarders:
+        _phone_forwarders.remove(fn)
+
+
+def toast(title, message, background=True, phone=False):
+    """Show a toast if NOTIFY is on. Runs on a background thread so it never blocks a reminder.
+
+    phone=True (reminders, timers, calendar alerts, memory dates) also sends it to the paired Telegram chat when
+    TELEGRAM_NOTIFY is on. Everything else (pairing codes!) stays on the laptop."""
+    if phone:
+        for forward in list(_phone_forwarders):
+            try:
+                forward(title, message)
+            except Exception as exc:  # the phone being unreachable must never stop a reminder
+                log.warning("[notify] couldn't send to the phone: %s", exc)
     if not config.NOTIFY:
         return False
     if background:

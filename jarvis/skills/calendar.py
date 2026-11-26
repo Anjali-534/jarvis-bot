@@ -306,7 +306,7 @@ def announce(ctx, event, current=None):
     start, _ = event_start(event)
     minutes = max(0, round((start - current).total_seconds() / 60))
     soon = f"in {say_duration(minutes * 60)}" if minutes else "now"
-    notify.toast("Upcoming event", f"{title_of(event)} at {say_clock(start, start)}")
+    notify.toast("Upcoming event", f"{title_of(event)} at {say_clock(start, start)}", phone=True)
     ctx.say(f"Heads up, {config.USER_NAME}: {title_of(event)} starts {soon}.", wait=False)
 
 

@@ -118,7 +118,11 @@ def _radio_toggle(ctx, kind, on, label):
         return f"I can't find a {label} radio on this laptop."
     if states[kind] == on:
         return f"{label} is already {'on' if on else 'off'}."
-    if kind == "wifi" and not on and config.STT_ENGINE == "google" and not getattr(ctx.voice, "text_mode", False):
+    if kind == "wifi" and not on and getattr(ctx.voice, "is_remote", False):
+        if not ctx.confirm("Wi-Fi off cuts this Telegram chat off too, and only the laptop can turn it back on. "
+                           "Turn it off anyway?"):
+            return "Okay, Wi-Fi stays on."
+    elif kind == "wifi" and not on and config.STT_ENGINE == "google" and not getattr(ctx.voice, "text_mode", False):
         if not ctx.confirm("If Wi-Fi goes off I can't understand speech (it's recognised online). Turn it off anyway?"):
             return "Okay, Wi-Fi stays on."
     if not set_radio(kind, on):

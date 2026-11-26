@@ -11,6 +11,7 @@ import time
 
 import config
 from jarvis import persona, timing
+from jarvis import telegram_remote  # noqa: F401  (registers the phone remote's startup hook)
 from jarvis.router import Context, handle, run_startup
 
 log = logging.getLogger(__name__)

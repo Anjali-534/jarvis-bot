@@ -479,7 +479,11 @@ def resolve(ctx, command):
     ai.announce_switch(ctx)
     from jarvis import router
 
-    if (sk.risky or target.risky) and not (target.confirms):
+    refusal = router.blocked(ctx, target)
+    if refusal:
+        ctx.say(refusal)
+        return target.name
+    if ((sk.risky or target.risky) and not target.confirms) or router.must_confirm(ctx, target):
         if not ctx.confirm(persona.line("confirm_action", action=phrase)):
             ctx.say(persona.line("not_done"))
             return target.name

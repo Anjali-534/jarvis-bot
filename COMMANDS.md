@@ -20,6 +20,20 @@ After Jarvis replies you have **20 seconds** to carry on without the wake word.
 
 **Stop:** "goodbye", "exit", "turn off Jarvis", or press **Ctrl+C**.
 
+## From your phone (Telegram)
+Set `TELEGRAM_BOT_TOKEN` (from @BotFather), send `/start` to your bot, then send back the 6-digit code shown on the laptop. Only that one chat can control Jarvis.
+- Text any command or question, exactly as you'd say it: "open chrome", "volume 30", "Dhruv ka birthday kab hai?", "petrol price today", or just chat. Replies come back as text.
+- Add "laptop pe bol" / "say it out loud" to hear the answer on the laptop as well.
+- Voice notes work too ("Heard: ..." shows what Jarvis understood).
+- `/status`: battery, charging, CPU, RAM, disk, Wi-Fi network, what's playing, awake or asleep, the last action, uptime.
+- `/lock`: locks the laptop at once, with no question.
+- "Send me my resume" / "resume bhej do": finds the file, asks with buttons, then sends it (up to 50 MB; never system folders, folders, or key/token/password files).
+- With `TELEGRAM_NOTIFY=true`: laptop reminders, timers, calendar alerts, memory dates, "battery below 15%" (once per drop) and "Jarvis started / stopped" also go to your phone.
+- `/screenshot` or "screenshot bhej": asks first, then sends it.
+- Risky things (shutdown, deleting or moving files, closing apps, messages, calendar changes, git pull) come with **Yes / No** buttons that expire after 60 seconds.
+- Typing, keys and the clipboard are off from the phone unless `TELEGRAM_ALLOW_KEYBOARD=true`.
+- `/unpair` stops that chat controlling the laptop. `/help` lists all this.
+
 ## Running in the background
 
 | Command | What it does |

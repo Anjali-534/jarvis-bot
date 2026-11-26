@@ -652,7 +652,7 @@ def tick(ctx, now=None):
         text = spoken(memory)
         line = persona.line("memory_today" if kind == "day" else "memory_tomorrow", memory=text)
         fired.append((kind, memory["text"]))
-        notify.toast("Today" if kind == "day" else "Tomorrow", text)
+        notify.toast("Today" if kind == "day" else "Tomorrow", text, phone=True)
         ctx.say(line, wait=False)
     if fired:
         save(data)

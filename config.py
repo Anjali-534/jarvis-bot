@@ -105,6 +105,13 @@ PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")
 APP_INDEX_FILE = _path("APP_INDEX_FILE", "data/app_index.json")      # refreshed daily and on "refresh apps"
 FILE_INDEX_FILE = _path("FILE_INDEX_FILE", "data/file_index.json")   # names + modified dates only, never contents
 ROUTINES_FILE = _path("ROUTINES_FILE", "data/routines.json")
+# Telegram phone remote: a bot token from @BotFather turns it on; only the paired chat can control Jarvis
+TELEGRAM_BOT_TOKEN = _str("TELEGRAM_BOT_TOKEN")
+TELEGRAM_FILE = _path("TELEGRAM_FILE", "data/telegram.json")         # the paired chat id (git-ignored)
+TELEGRAM_ALLOW_KEYBOARD = _bool("TELEGRAM_ALLOW_KEYBOARD", False)    # typing / keys / clipboard from the phone
+TELEGRAM_CONFIRM_SECONDS = _int("TELEGRAM_CONFIRM_SECONDS", 60)      # [Yes] [No] buttons expire after this
+TELEGRAM_NOTIFY = _bool("TELEGRAM_NOTIFY", False)  # reminders, timers, calendar, memory dates, low battery -> phone
+TELEGRAM_MAX_FILE_MB = _int("TELEGRAM_MAX_FILE_MB", 50)               # Telegram bots can send up to 50 MB
 MEMORY_FILE = _path("MEMORY_FILE", "data/memory.json")               # long-term memory (git-ignored)
 MEMORY_REMINDER_HOUR = _int("MEMORY_REMINDER_HOUR", 9)               # dated memories are spoken at this hour         # created from routines.example.json
 ROUTINES_EXAMPLE = BASE_DIR / "routines.example.json"

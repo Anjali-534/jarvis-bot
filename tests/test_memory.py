@@ -66,7 +66,7 @@ def test_month_only_dates_remind_on_the_first():
 
 def test_reminders_fire_at_9_on_the_day_and_the_day_before_for_birthdays(monkeypatch):
     toasts = []
-    monkeypatch.setattr(notify, "toast", lambda title, message: toasts.append((title, message)))
+    monkeypatch.setattr(notify, "toast", lambda title, message, **kw: toasts.append((title, message)))
     birthday = memory.add("Dhruv's birthday is 12 Feb", today=date(2026, 11, 26))
     service = memory.add("Meri bike ki service March mein hai", today=date(2026, 11, 26))
     ctx = make_ctx()
@@ -83,7 +83,7 @@ def test_reminders_fire_at_9_on_the_day_and_the_day_before_for_birthdays(monkeyp
 
 
 def test_reminder_fires_later_that_day_if_jarvis_started_late(monkeypatch):
-    monkeypatch.setattr(notify, "toast", lambda *a: None)
+    monkeypatch.setattr(notify, "toast", lambda *a, **kw: None)
     memory.add("Dhruv's birthday is 12 Feb", today=date(2026, 11, 26))
     assert memory.tick(make_ctx(), datetime(2027, 2, 12, 15, 0))
 

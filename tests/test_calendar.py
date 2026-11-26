@@ -213,7 +213,7 @@ def test_check_upcoming_schedules_alerts_once(monkeypatch):
 
 def test_announce_speaks_and_toasts(monkeypatch):
     toasts = []
-    monkeypatch.setattr(notify, "toast", lambda title, message: toasts.append((title, message)))
+    monkeypatch.setattr(notify, "toast", lambda title, message, **kw: toasts.append((title, message)))
     ctx = make_ctx()
     calendar.announce(ctx, event("a", "Standup", "2026-11-23T09:10:00+05:30"), NOW)
     assert ctx.voice.last == "Heads up, Anjali: Standup starts in 10 minutes."

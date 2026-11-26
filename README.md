@@ -116,6 +116,38 @@ python uninstall_startup.py   # undo that
 - **One copy only:** a named mutex stops a second Jarvis from starting. Launching it again, from the tray launcher or from `main.py`, wakes the one already running instead.
 - **Logs:** everything is written to `data\logs\jarvis.log`, rotating at 1 MB and keeping 5 old files. `main.py` also prints to the console; the tray app has no console, so check the log (tray menu > Open logs) if something seems wrong.
 
+## Telegram phone remote
+
+Control Jarvis on the laptop from your phone, by text or voice note. It uses long polling, so there's no server or webhook. It runs on a background thread in both the tray app and `main.py`.
+
+**Setting it up (about 2 minutes):**
+1. On your phone, open Telegram and search for **@BotFather** (the official one, with the blue tick).
+2. Send `/newbot`. Give it a display name (for example "My Jarvis"), then a username that ends in `bot` (for example `anjali_jarvis_bot`).
+3. BotFather replies with a token like `123456789:AAH...`. Treat it like a password. Put it in `.env` as `TELEGRAM_BOT_TOKEN=123456789:AAH...` (`.env` is git-ignored and checked by the secret scan).
+4. Optional: in BotFather, send `/setprivacy` and choose your bot, then `/setjoingroups` and **Disable**, so nobody can add it to a group.
+5. Restart Jarvis. The terminal says `[telegram] phone remote connected as @your_bot`.
+6. Open your bot on your phone and send `/start`. Jarvis shows a **6-digit pairing code** in the laptop terminal and as a notification. Send that code back to the bot. It's valid for 5 minutes and gives you 3 tries.
+
+Your chat id is saved in `data/telegram.json` (git-ignored). From then on, that one chat is the only one Jarvis listens to. Anyone else gets no reply at all, and is logged in `data/logs/actions.log`. `/unpair` removes the pairing.
+
+**What you can do:** text anything you'd say out loud. It goes through the same router as voice: natural language, memory, web search and the friend personality. Jarvis replies in text and stays silent on the laptop, unless you add "laptop pe bol" or "say it out loud". Voice notes are transcribed with the same speech engine, decoded with ffmpeg if you have it, or otherwise with PyAV (already installed with faster-whisper) or pydub. `/status` gives battery, charging, CPU, RAM, disk and uptime. `/screenshot` or "screenshot bhej" sends a screenshot, after asking first. Reminders set from the phone arrive on the phone.
+
+**Safety:**
+- Only the normal Jarvis skills run. There are no shell commands and no code.
+- Messages sent while the laptop was off are dropped, so a "shut down" can't run hours later.
+- Every question a skill asks becomes **[Yes] [No]** buttons, and typed answers work too. The buttons expire after 60 s (`TELEGRAM_CONFIRM_SECONDS`), and no answer counts as no.
+- Risky actions always ask from the phone, even ones that don't ask on the laptop: shutdown and restart, deleting or moving files, closing apps or windows, WhatsApp messages and email drafts, calendar changes, git pull, running a project, locking the laptop.
+- Typing into windows, key presses and the clipboard are off from the phone unless you set `TELEGRAM_ALLOW_KEYBOARD=true`.
+- Turning Wi-Fi off from the phone warns you first that it cuts the chat off.
+- `/lock` (or "lock the laptop") locks at once, with no question, because locking is safe. "Close this window" still asks.
+- **Files:** "send me my resume" or "resume bhej do" finds the file with the file index. When several files match, Jarvis asks which one. It then asks with buttons before sending the document. Files over 50 MB (`TELEGRAM_MAX_FILE_MB`, Telegram's limit for bots) are refused. So are folders, anything in system folders or Jarvis's own folder, and files that look like keys, tokens or passwords (`.env`, `.pem`, `.key`, `id_rsa`, password vaults).
+
+**Notifications** (`TELEGRAM_NOTIFY=true`): reminders, timers, calendar alerts and memory date reminders set on the laptop also go to your phone. So do "battery below 15% and not charging" (once per drop; it re-arms after you charge or the battery is back above 20%) and "Jarvis started / stopped". Pairing codes and other laptop toasts never go to the phone.
+
+**Status:** `/status` shows battery and charging, CPU, RAM, disk, the Wi-Fi network, what's playing, whether Jarvis is awake or asleep, the last action, and uptime.
+
+**Reliability:** if the network drops or Telegram is down, Jarvis logs `[telegram] can't reach Telegram (...). Retrying in 5 s.` and reconnects, backing off from 5 s to 60 s. Jarvis itself keeps working, and reminders are never held up by a failed send. A rejected token is logged once, and the remote turns off. "typing..." shows in the chat while Jarvis works on a command.
+
 ## Connecting Google and Spotify
 
 Everything is stored in `data\` (git-ignored). Jarvis never sends email. It only saves drafts, and it asks before creating or deleting anything.
@@ -367,6 +399,7 @@ jarvis/translit.py      Hindi (Devanagari) -> English command rewriting
 jarvis/http.py          shared requests.Session with timeouts: get_json / get_text / post_json
 jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_from_command()
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")
+jarvis/telegram_remote.py  Telegram phone remote: pairing, buttons for risky actions, text/voice notes, /status
 jarvis/desktop.py       low-level Windows calls: windows, focus, WM_CLOSE, Unicode typing, clipboard, password box
 jarvis/actions.py       action log (data/logs/actions.log), undo stack, protected-folder guard
 jarvis/hinglish.py      regex pieces for verb-last Hinglish ("wifi band kar de", "chrome pe switch kar")

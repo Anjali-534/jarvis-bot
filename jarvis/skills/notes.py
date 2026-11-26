@@ -91,10 +91,10 @@ def schedule(ctx, delay_seconds, message, kind="reminder"):
         if entry in _reminders(ctx):
             _reminders(ctx).remove(entry)
         if kind == "timer":
-            notify.toast("Timer done", f"Your {message} timer is done.")
+            notify.toast("Timer done", f"Your {message} timer is done.", phone=True)
             ctx.say(persona.line("timer_done", message=message), wait=False)
         else:
-            notify.toast("Reminder", message)  # visible even while muted or in a meeting
+            notify.toast("Reminder", message, phone=True)  # visible even while muted or in a meeting
             ctx.say(persona.line("reminder", message=message), wait=False)
 
     timer = threading.Timer(delay_seconds, fire)

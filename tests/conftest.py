@@ -40,6 +40,15 @@ def _no_real_laptop_control(monkeypatch, tmp_path, forbidden):
     monkeypatch.setattr(config, "FILE_INDEX_FILE", tmp_path / "data" / "file_index.json")
     monkeypatch.setattr(config, "ROUTINES_FILE", tmp_path / "data" / "routines.json")
     monkeypatch.setattr(config, "MEMORY_FILE", tmp_path / "data" / "memory.json")
+    monkeypatch.setattr(config, "TELEGRAM_BOT_TOKEN", "")  # the phone remote never starts in tests
+    monkeypatch.setattr(config, "TELEGRAM_FILE", tmp_path / "data" / "telegram.json")
+    monkeypatch.setattr(config, "TELEGRAM_ALLOW_KEYBOARD", False)
+    monkeypatch.setattr(config, "TELEGRAM_CONFIRM_SECONDS", 60)
+    monkeypatch.setattr(config, "TELEGRAM_NOTIFY", False)
+    monkeypatch.setattr(config, "TELEGRAM_MAX_FILE_MB", 50)
+    from jarvis import notify
+
+    monkeypatch.setattr(notify, "_phone_forwarders", [])
     monkeypatch.setattr(config, "MEMORY_REMINDER_HOUR", 9)
     monkeypatch.setattr(config, "TYPE_CONFIRM_CHARS", 200)
     monkeypatch.setattr(app_index, "scan_shortcuts", lambda: [])
