@@ -33,12 +33,23 @@ CATEGORIES = [
     (10**9, "Severe", "Stay indoors, run an air purifier if you have one, and wear an N95 if you must go out."),
 ]
 
-NCR_POINTS = [
-    Place("Central Delhi", 28.6328, 77.2197), Place("Rohini", 28.7383, 77.0822), Place("Dwarka", 28.5921, 77.0460),
-    Place("Anand Vihar", 28.6469, 77.3164), Place("Noida", 28.5355, 77.3910), Place("Greater Noida", 28.4744, 77.5040),
-    Place("Ghaziabad", 28.6692, 77.4538), Place("Gurugram", 28.4595, 77.0266), Place("Faridabad", 28.4089, 77.3178),
-    Place("Sonipat", 28.9931, 77.0151),
-]
+AREA_KM = (10, 20)  # red zones: the city centre plus points about 10 and 20 km out in 8 directions
+
+
+def area_points(center, distances=AREA_KM):
+    """Points around the user's city for red zones: 'Central Pune', 'North of Pune (about 10 km)', ..."""
+    import math
+
+    points = [Place(f"Central {center.name}", center.lat, center.lon)]
+    directions = [("North", 0), ("North-east", 45), ("East", 90), ("South-east", 135), ("South", 180),
+                  ("South-west", 225), ("West", 270), ("North-west", 315)]
+    for km in distances:
+        for label, bearing in directions:
+            d_lat = km / 111.0 * math.cos(math.radians(bearing))
+            d_lon = km / (111.0 * max(0.2, math.cos(math.radians(center.lat)))) * math.sin(math.radians(bearing))
+            points.append(Place(f"{label} of {center.name} (about {km} km)", round(center.lat + d_lat, 4),
+                                round(center.lon + d_lon, 4)))
+    return points
 
 
 # ---------------------------------------------------------------- CPCB maths
@@ -209,8 +220,8 @@ def _waqi_red_zones(place):
 @skill("red zones", r"\bred\s*zones?\b", r"\bred areas?\b", r"\bmost polluted\b", r"\bworst (?:air|aqi|areas?|pollution)\b", category='air quality', help=['red zones'])
 def red_zones(ctx, command, match):
     threshold = config.RED_ZONE_THRESHOLD
+    place = geo.current_place(ctx, command)
     if config.WAQI_TOKEN:
-        place = geo.current_place(ctx, command)
         try:
             stations = _waqi_red_zones(place)
         except ValueError as exc:
@@ -223,13 +234,13 @@ def red_zones(ctx, command, match):
                 return f"Red zones near {place.name} right now, from live monitoring stations: {listed}."
             name, aqi = stations[0]
             return f"No station near {place.name} is above {threshold} right now. The worst is {name} at {aqi}."
-    readings = sorted(fetch_air(NCR_POINTS), key=lambda r: -r.aqi)
+    readings = sorted(fetch_air(area_points(place)), key=lambda r: -r.aqi)
     red = [r for r in readings if r.aqi > threshold][:6]
     if red:
         listed = ", ".join(f"{r.place.name} {r.aqi}" for r in red)
-        return f"Today's red zones in Delhi NCR are: {listed}. These are area-level estimates."
+        return f"Today's red zones around {place.name} are: {listed}. These are area-level estimates."
     worst = readings[0]
-    return (f"None of the Delhi NCR areas I track are in the red zone right now. "
+    return (f"None of the areas around {place.name} are in the red zone right now. "
             f"The worst is {worst.place.name} with an AQI of {worst.aqi}, {worst.category}.")
 
 

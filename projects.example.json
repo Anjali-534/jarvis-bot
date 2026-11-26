@@ -1,4 +1,5 @@
 {
-  "bogie backend": "C:\\Users\\ADMIN\\OneDrive\\Desktop\\ANJALI\\bogie-backend",
-  "portfolio": "D:\\code\\my-portfolio-site"
+  "_help": "Copy to your data folder as projects.json. Spoken name -> project folder.",
+  "acme backend": "%USERPROFILE%\\Documents\\acme-backend",
+  "portfolio": "%USERPROFILE%\\Documents\\portfolio-site"
 }

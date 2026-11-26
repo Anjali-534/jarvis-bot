@@ -41,7 +41,7 @@ def test_good_morning_gives_briefing_in_order(monkeypatch, caplog):
         assert handle(ctx, "good morning jarvis") == "morning briefing"
     spoken = ctx.voice.said[0]
     assert len(ctx.voice.said) == 1  # ONE briefing
-    order = ["Good morning, Anjali. It's Monday, 23 November.", "Today in New Delhi", "Air quality",
+    order = ["Good morning, Meera. It's Monday, 23 November.", "Today in New Delhi", "Air quality",
              "You have 2 events", "4 unread emails", "Reminders today", "Top headline"]
     positions = [spoken.index(piece) for piece in order]
     assert positions == sorted(positions)
@@ -120,7 +120,7 @@ def test_forty_second_budget(monkeypatch):
     handle(ctx, "brief me")
     spoken = ctx.voice.said[0]
     assert briefing.spoken_seconds(spoken) <= 40
-    assert spoken.startswith("Good morning, Anjali.")
+    assert spoken.startswith("Good morning, Meera.")
 
 
 def test_real_sections_fit_the_budget(monkeypatch):
@@ -150,12 +150,12 @@ def test_hinglish_in_hindi_mode(monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "test")
     sent = []
     monkeypatch.setattr(ai, "complete", lambda system, history, text, max_tokens=150: sent.append(text) or (
-        200, "Good morning Anjali! Aaj Delhi mein 12 se 24 degree rahega."))
+        200, "Good morning Meera! Aaj Delhi mein 12 se 24 degree rahega."))
     voice = FakeVoice()
     voice.language = "hi-IN"
     ctx = Context(voice)
     handle(ctx, "good morning")
-    assert voice.said == ["Good morning Anjali! Aaj Delhi mein 12 se 24 degree rahega."]
+    assert voice.said == ["Good morning Meera! Aaj Delhi mein 12 se 24 degree rahega."]
     assert "Today in New Delhi" in sent[0]
 
 
@@ -165,7 +165,7 @@ def test_hindi_mode_without_ai_key_stays_english(monkeypatch):
     voice.language = "hi-IN"
     ctx = Context(voice)
     handle(ctx, "good morning")
-    assert voice.said[0].startswith("Good morning, Anjali.")
+    assert voice.said[0].startswith("Good morning, Meera.")
 
 
 def test_hinglish_rejects_devanagari(monkeypatch):
@@ -239,7 +239,7 @@ def test_good_night(monkeypatch):
     monkeypatch.setattr(notes, "schedule", lambda ctx, seconds, text, kind="reminder": scheduled.append(text))
     ctx = make_ctx(["7 am"])
     assert handle(ctx, "good night jarvis") == "good night"
-    assert ctx.voice.said[0] == ("Good night, Anjali. Tomorrow starts with Standup at 10 AM. Tomorrow in New Delhi: "
+    assert ctx.voice.said[0] == ("Good night, Meera. Tomorrow starts with Standup at 10 AM. Tomorrow in New Delhi: "
                                  "10 to 22 degrees, rain, 70 percent chance of rain.")
     assert ctx.voice.said[1].startswith("Shall I set a wake-up reminder?")
     assert scheduled == ["Good morning! Time to wake up."]
@@ -256,7 +256,7 @@ def test_good_night_declining_alarm(monkeypatch):
     monkeypatch.setattr(notes, "schedule", lambda *a, **k: pytest.fail("no alarm was asked for"))
     ctx = make_ctx(["no thanks"])
     handle(ctx, "good night")
-    assert ctx.voice.said[0] == "Good night, Anjali."
+    assert ctx.voice.said[0] == "Good night, Meera."
     assert ctx.voice.last == "Sleep well."
 
 
@@ -298,7 +298,7 @@ def test_tick_runs_once_per_day_with_toast(monkeypatch):
     monkeypatch.setattr(notify, "toast", lambda title, message: toasts.append(title))
     ctx = make_ctx()
     assert briefing.tick(ctx, datetime(2026, 11, 23, 8, 31)) is True
-    assert toasts == ["Morning briefing"] and ctx.voice.said[0].startswith("Good morning, Anjali.")
+    assert toasts == ["Morning briefing"] and ctx.voice.said[0].startswith("Good morning, Meera.")
     assert briefing.done_on() == date(2026, 11, 23)  # remembered in data/cache.json
     assert briefing.tick(ctx, datetime(2026, 11, 23, 9, 0)) is False
     assert len(ctx.voice.said) == 1 and toasts == ["Morning briefing"]

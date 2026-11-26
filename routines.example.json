@@ -4,7 +4,7 @@
     "work mode": {
       "aliases": ["work", "office mode", "kaam"],
       "steps": [
-        "open bogie in vs code",
+        "open vs code",
         "open gmail in chrome",
         "open github in chrome",
         "play my focus playlist on spotify",

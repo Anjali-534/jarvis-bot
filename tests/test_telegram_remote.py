@@ -67,7 +67,7 @@ def paired(phone):
     return phone
 
 
-def send(remote, text, chat=ME, who="@anjali"):
+def send(remote, text, chat=ME, who="@meera"):
     remote.on_message(chat, text, who)
     remote.join()
 
@@ -179,7 +179,7 @@ def test_risky_actions_ask_with_buttons_and_no_does_nothing(paired, skill_log):
 
 @pytest.mark.parametrize("command, skill", [
     ("shut down the laptop", "power"), ("delete invoice.pdf", "delete file"), ("move resume to documents", "move file"),
-    ("close all apps", "close all apps"), ("pull jarvis", "git pull"), ("run bogie backend", "run project"),
+    ("close all apps", "close all apps"), ("pull jarvis", "git pull"), ("run acme backend", "run project"),
     ("send a whatsapp to mom saying hi", "whatsapp message"), ("email dhruv saying hi", "email draft"),
     ("add meeting with dhruv tomorrow at 5 pm", "add event"), ("cancel my 5 pm meeting", "cancel event"),
     ("close this window", "close window"),

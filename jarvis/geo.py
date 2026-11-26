@@ -17,7 +17,10 @@ class Place:
     lon: float
 
 
-FALLBACK_PLACES = {"new delhi": Place("New Delhi", 28.6139, 77.2090), "delhi": Place("Delhi", 28.6519, 77.2315)}
+# Known coordinates (no network needed). The setup wizard stores your city's here via HOME_LAT/HOME_LON; tests
+# add their own. Empty by default: no city is assumed.
+FALLBACK_PLACES: dict = {}
+NO_LOCATION = ("I don't know where you are yet. Say 'my area is' and your city or pincode, or set it in Settings.")
 
 _CACHE: dict[str, Place | None] = {}
 PLACE_CACHE_SECONDS = 30 * 24 * 3600  # places don't move: keep geocoding results on disk for 30 days
@@ -84,7 +87,7 @@ def _nominatim(query):
     if pin:
         name = parts[0] if parts else f"pincode {pin}"
     elif _DEVANAGARI.search(query):
-        name = parts[0] if parts else query  # "दिल्ली" -> "Delhi", so the voice can say it
+        name = parts[0] if parts else query  # a Devanagari city name -> its English name, so the voice can say it
     else:
         name = query.title()
     return Place(name, float(first["lat"]), float(first["lon"]))
@@ -130,10 +133,24 @@ def geocode(query):
 
 
 def default_place():
-    known = FALLBACK_PLACES.get(config.DEFAULT_LOCATION.strip().lower())
+    """Your home city (DEFAULT_LOCATION). No city set: a SpokenError asking for one."""
+    from jarvis.router import SpokenError
+
+    location = (config.DEFAULT_LOCATION or "").strip()
+    if not location:
+        raise SpokenError(NO_LOCATION)
+    known = FALLBACK_PLACES.get(location.lower())
     if known:
-        return known  # built-in coordinates: no network round trip (saves ~2 s on every default lookup)
-    return geocode(config.DEFAULT_LOCATION) or FALLBACK_PLACES["new delhi"]
+        return known  # known coordinates: no network round trip (saves ~2 s on every default lookup)
+    lat, lon = getattr(config, "HOME_LAT", None), getattr(config, "HOME_LON", None)
+    if lat is not None and lon is not None:  # saved by the setup wizard when it checked your city
+        place = Place(location.split(",")[0].strip(), lat, lon)
+        FALLBACK_PLACES[location.lower()] = place
+        return place
+    place = geocode(location)
+    if place is None:
+        raise SpokenError(f"I couldn't find {location} on the map. Check your city in Settings.")
+    return place
 
 
 def current_place(ctx, command=""):

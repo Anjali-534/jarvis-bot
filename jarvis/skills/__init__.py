@@ -2,7 +2,7 @@
 
 gmail, calendar and spotify come before system and web so "search email for invoice" isn't a
 Google search and "play X on spotify" isn't YouTube. whatsapp and vscode come before apps so
-"open bogie in vs code" isn't caught by the generic "open X" skill. browse comes before system and apps
+"open acme in vs code" isn't caught by the generic "open X" skill. browse comes before system and apps
 so "search more about its battery" is a web search and "open the first source" opens the search result.
 web_questions (the regex fast path to a web answer: "petrol price today") comes after weather, aqi and
 web (news) and before knowledge, so "weather today" stays weather but "who is the current PM" is

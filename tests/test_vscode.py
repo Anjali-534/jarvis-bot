@@ -19,11 +19,11 @@ def touch(path, text=""):
 @pytest.fixture
 def tree(tmp_path, monkeypatch):
     root = tmp_path / "code"
-    touch(root / "bogie-backend" / "package.json", json.dumps({"scripts": {"dev": "nodemon", "start": "node ."}}))
-    touch(root / "bogie-admin-panel" / "package.json", json.dumps({"scripts": {"start": "react-scripts start"}}))
-    (root / "bogie-frontend" / ".git").mkdir(parents=True)
-    touch(root / "bogie-frontend" / "src" / "App.tsx")
-    touch(root / "bogie-frontend" / "node_modules" / "react" / "App.tsx")
+    touch(root / "acme-backend" / "package.json", json.dumps({"scripts": {"dev": "nodemon", "start": "node ."}}))
+    touch(root / "acme-admin-panel" / "package.json", json.dumps({"scripts": {"start": "react-scripts start"}}))
+    (root / "acme-frontend" / ".git").mkdir(parents=True)
+    touch(root / "acme-frontend" / "src" / "App.tsx")
+    touch(root / "acme-frontend" / "node_modules" / "react" / "App.tsx")
     touch(root / "tools" / "go-api" / "go.mod")                       # level 2: found
     touch(root / "deep" / "a" / "too-deep" / "requirements.txt")     # level 3: skipped
     touch(root / "node_modules" / "left-pad" / "package.json")       # ignored dir
@@ -45,13 +45,13 @@ def shell_log(monkeypatch):
 
 def test_scan_finds_projects_two_levels_deep(tree):
     projects = vscode.scan_projects()
-    assert set(projects) == {"bogie backend", "bogie admin panel", "bogie frontend", "go api", "jarvis"}
+    assert set(projects) == {"acme backend", "acme admin panel", "acme frontend", "go api", "jarvis"}
     assert projects["go api"] == tree / "tools" / "go-api"
 
 
 def test_aliases_merge_and_rescan(tree, shell_log):
-    touch(config.PROJECTS_FILE, json.dumps({"api": str(tree / "bogie-backend")}))
-    assert vscode.get_projects()["api"] == tree / "bogie-backend"
+    touch(config.PROJECTS_FILE, json.dumps({"api": str(tree / "acme-backend")}))
+    assert vscode.get_projects()["api"] == tree / "acme-backend"
     touch(tree / "new-thing" / "go.mod")
     assert "new thing" not in vscode.get_projects()          # cached
     ctx = make_ctx()
@@ -60,8 +60,8 @@ def test_aliases_merge_and_rescan(tree, shell_log):
 
 
 @pytest.mark.parametrize("query, best", [
-    ("bogie admin", "bogie admin panel"), ("bogie-backend", "bogie backend"), ("jarvis", "jarvis"),
-    ("the jarvis project", "jarvis"), ("bogey front end", "bogie frontend"), ("go api", "go api"),
+    ("acme admin", "acme admin panel"), ("acme-backend", "acme backend"), ("jarvis", "jarvis"),
+    ("the jarvis project", "jarvis"), ("bogey front end", "acme frontend"), ("go api", "go api"),
 ])
 def test_fuzzy_matching(tree, query, best):
     assert vscode.match_projects(query)[0] == best
@@ -73,25 +73,25 @@ def test_no_match():
 
 def test_open_project(tree, shell_log):
     ctx = make_ctx()
-    assert handle(ctx, "open bogie admin in vs code") == "vscode open project"
-    assert shell_log == [f'code "{tree / "bogie-admin-panel"}"']
-    assert ctx.voice.last == "Opening bogie admin panel in VS Code."
+    assert handle(ctx, "open acme admin in vs code") == "vscode open project"
+    assert shell_log == [f'code "{tree / "acme-admin-panel"}"']
+    assert ctx.voice.last == "Opening acme admin panel in VS Code."
 
 
 def test_ambiguous_project_asks(tree, shell_log):
     ctx = make_ctx(["the second one"])
-    handle(ctx, "work on bogie")
+    handle(ctx, "work on acme")
     assert ctx.voice.said[0].startswith("I found ") and ctx.voice.said[0].endswith("Which one?")
     options = ctx.voice.said[0][len("I found "):-len(". Which one?")].replace(" and ", ", ").split(", ")
-    assert len(options) == 3 and all(o.startswith("bogie") for o in options)
+    assert len(options) == 3 and all(o.startswith("acme") for o in options)
     chosen = vscode.get_projects()[options[1]]
     assert shell_log == [f'code "{chosen}"']
 
 
 def test_ambiguous_answer_by_name(tree, shell_log):
     ctx = make_ctx(["backend"])
-    handle(ctx, "open bogie project")
-    assert shell_log == [f'code "{tree / "bogie-backend"}"']
+    handle(ctx, "open acme project")
+    assert shell_log == [f'code "{tree / "acme-backend"}"']
 
 
 def test_unknown_project(tree, shell_log):
@@ -109,7 +109,7 @@ def test_new_window(shell_log):
 
 def test_open_file_skips_ignored_dirs(tree, shell_log):
     assert vscode.find_file(tree / "jarvis", "router dot py") == tree / "jarvis" / "jarvis" / "router.py"
-    assert vscode.find_file(tree / "bogie-frontend", "app") == tree / "bogie-frontend" / "src" / "App.tsx"
+    assert vscode.find_file(tree / "acme-frontend", "app") == tree / "acme-frontend" / "src" / "App.tsx"
     assert vscode.find_file(tree / "jarvis", "nothing here") is None
     ctx = make_ctx()
     handle(ctx, "open file router.py in jarvis")
@@ -117,8 +117,8 @@ def test_open_file_skips_ignored_dirs(tree, shell_log):
 
 
 @pytest.mark.parametrize("folder, command", [
-    ("bogie-backend", "npm run dev"), ("bogie-admin-panel", "npm start"), ("tools/go-api", "go run ."),
-    ("jarvis", "python main.py"), ("bogie-frontend", None),
+    ("acme-backend", "npm run dev"), ("acme-admin-panel", "npm start"), ("tools/go-api", "go run ."),
+    ("jarvis", "python main.py"), ("acme-frontend", None),
 ])
 def test_detect_run_command(tree, folder, command):
     assert vscode.detect_run_command(tree / folder) == command
@@ -126,9 +126,9 @@ def test_detect_run_command(tree, folder, command):
 
 def test_run_project_confirms_and_opens_terminal(tree, shell_log):
     ctx = make_ctx(["yes"])
-    handle(ctx, "run bogie backend")
-    assert ctx.voice.said[0] == "Run npm run dev in bogie backend?"
-    assert shell_log == [f'start "bogie backend" /D "{tree / "bogie-backend"}" cmd /k npm run dev']
+    handle(ctx, "run acme backend")
+    assert ctx.voice.said[0] == "Run npm run dev in acme backend?"
+    assert shell_log == [f'start "acme backend" /D "{tree / "acme-backend"}" cmd /k npm run dev']
 
 
 def test_run_project_refused(tree, shell_log):
@@ -152,7 +152,7 @@ def test_list_projects(tree):
     handle(ctx, "list my projects")
     ctx = make_ctx(["yes"])
     handle(ctx, "list my projects")
-    assert ctx.voice.said == ["You have 5 projects: bogie admin panel, bogie backend and bogie frontend.", "Want more?",
+    assert ctx.voice.said == ["You have 5 projects: acme admin panel, acme backend and acme frontend.", "Want more?",
                               "go api and jarvis."]
 
 
@@ -209,12 +209,12 @@ def test_git_status_asks_which_project(tree, monkeypatch):
 def test_pull_requires_confirmation(tree, monkeypatch):
     calls = fake_git(monkeypatch, "Already up to date.\n")
     ctx = make_ctx(["no"])
-    handle(ctx, "pull bogie frontend")
+    handle(ctx, "pull acme frontend")
     assert calls == [] and ctx.voice.last == "Okay, I didn't pull."
     ctx = make_ctx(["yes"])
-    handle(ctx, "pull bogie frontend")
-    assert calls == [["git", "-C", str(tree / "bogie-frontend"), "pull", "--ff-only"]]
-    assert ctx.voice.last == "Bogie Frontend is already up to date."
+    handle(ctx, "pull acme frontend")
+    assert calls == [["git", "-C", str(tree / "acme-frontend"), "pull", "--ff-only"]]
+    assert ctx.voice.last == "Acme Frontend is already up to date."
 
 
 def test_no_dangerous_git_commands_by_voice(tree, monkeypatch):

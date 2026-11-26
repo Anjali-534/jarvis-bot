@@ -14,7 +14,7 @@ def b64(text):
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
 
-def mail(mid, sender, subject, body="", to="anjali@example.com", date="Mon, 23 Nov 2026 09:00:00 +0530", html=False):
+def mail(mid, sender, subject, body="", to="meera@example.com", date="Mon, 23 Nov 2026 09:00:00 +0530", html=False):
     part = {"mimeType": "text/html" if html else "text/plain", "body": {"data": b64(body)}}
     return {
         "id": mid, "snippet": body[:80],

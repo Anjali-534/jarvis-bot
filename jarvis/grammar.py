@@ -162,6 +162,7 @@ def fix(text, user_female=None, me_female=None):
     """Fix gender agreement in Hinglish text. Defaults come from USER_GENDER and the voice."""
     if not text:
         return text
+    neutral_user = user_female is None and persona.user_is_neutral()  # neutral: leave words about the user alone
     user_female = persona.user_is_female() if user_female is None else user_female
     me_female = persona.voice_is_female() if me_female is None else me_female
     tokens = _WORD.findall(text)
@@ -231,7 +232,7 @@ def fix(text, user_female=None, me_female=None):
                     who, plural = subject
                 elif is_question and not explicit and _about_user(word, prev, lowered, pos):
                     who, plural = "you", False
-            if who is None:
+            if who is None or (who == "you" and neutral_user):
                 continue
             female = user_female if who == "you" else me_female
             new = _form(word, female, plural)

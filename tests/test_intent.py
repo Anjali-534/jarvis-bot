@@ -351,7 +351,7 @@ def test_router_timeout_falls_back_to_chat(ai_router, monkeypatch):
 
 def test_router_model_is_configurable(ai_router, monkeypatch):
     monkeypatch.setattr(config, "AI_ROUTER_MODEL", "openai/gpt-oss-20b")
-    ai_router.append(text_reply("Hello there, Anjali!"))
+    ai_router.append(text_reply("Hello there, Meera!"))
     handle(make_ctx(), "hey whats up buddy")
     assert ai_router.requests[0]["payload"]["model"] == "openai/gpt-oss-20b"
 

@@ -1,4 +1,5 @@
-"""Every test runs offline, without real apps, and without the user's real data files."""
+"""Every test runs offline, without real apps, and without the user's real data files, settings or secrets."""
+import os
 import sys
 from pathlib import Path
 
@@ -7,6 +8,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
+
+# Before config loads: no settings.json, no .env, no Credential Manager, no migration
+os.environ["JARVIS_TESTING"] = "1"
+os.environ["JARVIS_NO_VAULT"] = "1"
 
 import config  # noqa: E402
 import jarvis.skills  # noqa: E402,F401
@@ -93,12 +98,12 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(spotify, "sleep", lambda seconds: None)
     monkeypatch.setattr(calendar, "schedule_alert", forbidden)
 
-    monkeypatch.setattr(config, "USER_NAME", "Anjali")
+    monkeypatch.setattr(config, "USER_NAME", "Meera")
     # Personality: the original professional wording, always the first variant (friend tests switch it on)
     from jarvis import persona
 
     monkeypatch.setattr(config, "PERSONALITY", "professional")
-    monkeypatch.setattr(config, "NICKNAME", "Anjali")
+    monkeypatch.setattr(config, "NICKNAME", "Meera")
     monkeypatch.setattr(persona, "_session_mode", None)
     monkeypatch.setattr(persona, "choose", lambda options: options[0])
     monkeypatch.setattr(persona, "AVOID_REPEAT", False)
@@ -153,6 +158,15 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CALENDAR_REMINDER_MINUTES", 10)
     monkeypatch.setattr(vscode, "_cache", None)
     geo._CACHE.clear()
+    # The test world: a Hinglish-speaking user in a sample city with known coordinates (no geocoding calls)
+    monkeypatch.setattr(config, "LANGUAGE", "hinglish")
+    monkeypatch.setattr(config, "DEFAULT_LOCATION", "New Delhi")
+    monkeypatch.setattr(config, "HOME_LAT", None)
+    monkeypatch.setattr(config, "HOME_LON", None)
+    monkeypatch.setattr(geo, "FALLBACK_PLACES", {"new delhi": geo.Place("New Delhi", 28.6139, 77.2090),
+                                                 "delhi": geo.Place("Delhi", 28.6519, 77.2315)})
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(config, "SETTINGS_FILE", tmp_path / "data" / "settings.json")
     _no_real_laptop_control(monkeypatch, tmp_path, forbidden)
     yield
     from jarvis.skills import notes

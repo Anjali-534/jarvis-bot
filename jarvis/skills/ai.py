@@ -353,9 +353,15 @@ def recover_model():
     log.warning("[ai] model %s is retired or unavailable, switching to %s (saved to .env)", old, replacement)
     config.AI_MODEL = replacement
     try:
-        update_env_model(replacement)
+        from jarvis import settings_store
+
+        has_settings, has_env = config.SETTINGS_FILE.exists(), config.ENV_FILE.exists()
+        if has_settings or not has_env:
+            settings_store.update({"AI_MODEL": replacement})  # settings.json wins over .env, so it goes there
+        if has_env or not has_settings:
+            update_env_model(replacement)  # a .env setup (or no settings at all): keep .env right too
     except OSError as exc:
-        log.warning("[ai] couldn't update AI_MODEL in .env: %s", exc)
+        log.warning("[ai] couldn't save the new AI_MODEL: %s", exc)
     from jarvis import cache
 
     cache.put(_model_cache_key(), True)

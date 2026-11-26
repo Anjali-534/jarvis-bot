@@ -49,7 +49,7 @@ def test_b_questions_get_a_friendly_answer(ai_router, friend):
     assert ctx.voice.said == ["Haan yaar, MBA tab karna jab goal clear ho.", "Pehle 2 saal kaam kar le, phir decide kar."]
     rules = routing_prompt(ai_router)
     assert "3) Knowledge, advice, opinions, maths, coding, chat: reply" in rules
-    assert "close Delhi friend" in rules and "real opinions with reasons" in rules
+    assert "close friend from New Delhi" in rules and "real opinions with reasons" in rules
     assert "CA/lawyer se confirm kar lena" in rules and "never make up facts" in rules
     assert "Pakka nahi pata yaar" in rules  # says so plainly when it doesn't know
     assert ctx.state["ai_history"][-1]["content"].startswith("Haan yaar, MBA")  # remembered for follow-ups
@@ -245,7 +245,7 @@ def test_no_hard_coded_gender_in_any_phrase():
 
 
 def render_all(**extra):
-    values = dict(name="Anjali", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
+    values = dict(name="Meera", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
                   action="restart", delay="15 seconds", duration="5 minutes", text="t", count="2 notes", time="2",
                   alternative="Google pe dhoondh doon", place="Rohini", aqi="312", day="12 February", every="", memory="m", topic="bike", old="o", new="n", folder="Documents", 
                   **persona._verb_forms(), **extra)
@@ -274,7 +274,7 @@ def test_genders_render_right_both_ways(monkeypatch, voice, user, right, wrong):
 def test_ai_is_told_both_genders(friend, monkeypatch):
     style = persona.ai_style()
     assert "you are male, so use male verb forms for yourself ('main kar dunga', 'main aa gaya'" in style
-    assert "Anjali is female, so address her with female forms ('tu kaisi hai?', 'thak gayi kya?'" in style
+    assert "Meera is female, so address her with female forms ('tu kaisi hai?', 'thak gayi kya?'" in style
     monkeypatch.setattr(config, "USER_GENDER", "male")
     assert "address him with male forms ('tu kaisa hai?'" in persona.ai_style()
 

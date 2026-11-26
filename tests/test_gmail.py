@@ -114,13 +114,13 @@ def test_search_email_top_three(monkeypatch):
 
 
 def test_read_email_from_contact_gives_first_two_sentences(monkeypatch, contacts):
-    body = ("Hi Anjali. The demo moved to 5 pm. Please bring the laptop. Thanks!\n\n"
-            "On Mon, 23 Nov 2026 Anjali wrote:\n> old quoted text")
+    body = ("Hi Meera. The demo moved to 5 pm. Please bring the laptop. Thanks!\n\n"
+            "On Mon, 23 Nov 2026 Meera wrote:\n> old quoted text")
     fake = use(monkeypatch, FakeGmail([mail("9", "Dhruv <dhruv@example.com>", "Demo", body)],
                                       {"in:inbox from:(dhruv@example.com)": ["9"]}))
     ctx = make_ctx()
     assert handle(ctx, "read the email from dhruv") == "read email"
-    assert ctx.voice.last == "The latest email from Dhruv, subject Demo. Hi Anjali. The demo moved to 5 pm."
+    assert ctx.voice.last == "The latest email from Dhruv, subject Demo. Hi Meera. The demo moved to 5 pm."
     assert fake.fetched == [("9", "full")]
 
 

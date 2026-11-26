@@ -674,7 +674,7 @@ _ELSEWHERE = re.compile(r"\b(?:on|in)\s+(?:youtube|spotify)$|^(?:my\s+)?(?:e-?ma
        r"^(.+?)\s+(?:internet|net|online|google|web)\s+(?:pe|par|par se|pe se)\s+(?:dekho|dekh ke batao|search karo|"
        r"check karo|dhundo)$",
        r"^(?:internet|net|online|google|web)\s+(?:pe|par)\s+(?:dekho|search karo|check karo|dhundo)\s+(.+)$",
-       category="web", help=["search the web for the latest iPhone", "look up petrol price in Delhi today",
+       category="web", help=["search the web for the latest iPhone", "look up petrol price in Mumbai today",
                              "who won the match yesterday"],
        tool="web_search", params={"query": "a short search query in English, e.g. sensex today (no dates the user "
                                            "didn't say)"},

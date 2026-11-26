@@ -31,7 +31,7 @@ def remember(*facts):
     ("remember that Dhruv's birthday is 12 Feb", "Dhruv's birthday is 12 Feb", "dates"),
     ("remember I like cold coffee", "I like cold coffee", "preferences"),
     ("yaad rakhna ki meri bike ki service March mein hai", "Meri bike ki service March mein hai", "dates"),
-    ("remember that the bogie demo is on friday", "The bogie demo is on friday", "work"),
+    ("remember that the acme project demo is on friday", "The acme project demo is on friday", "work"),
     ("remember that mom's favourite flower is the lily", "Mom's favourite flower is the lily", "preferences"),
     ("remember that my sister lives in Pune", "My sister lives in Pune", "personal"),
     ("dhruv ka number 98765 43210 hai yaad rakhna", "Dhruv ka number 98765 43210 hai", "people"),

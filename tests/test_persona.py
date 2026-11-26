@@ -53,7 +53,7 @@ def test_every_phrase_renders_for_both_voice_genders(monkeypatch, tts_voice, wan
 
     monkeypatch.setattr(config, "TTS_ENGINE", "edge")
     monkeypatch.setattr(config, "TTS_VOICE", tts_voice)
-    values = dict(name="Anjali", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
+    values = dict(name="Meera", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
                   action="restart", delay="15 seconds", duration="5 minutes", text="t", count="2 notes", time="2",
                   alternative="Google pe dhoondh doon", day="12 February", every="", memory="m", topic="bike", old="o", new="n", folder="Documents", 
                   **persona._verb_forms())
@@ -78,7 +78,7 @@ def test_variants_dont_repeat_back_to_back(friend, varied):
 
 def test_both_personalities_and_the_nickname(monkeypatch):
     monkeypatch.setattr(config, "NICKNAME", "Anju")
-    assert persona.online_greeting(datetime(2026, 11, 25, 8)) == "Good morning, Anjali. Jarvis is online."
+    assert persona.online_greeting(datetime(2026, 11, 25, 8)) == "Good morning, Meera. Jarvis is online."
     monkeypatch.setattr(config, "PERSONALITY", "friend")
     morning = persona.online_greeting(datetime(2026, 11, 25, 8))
     assert morning in friend_lines("online_morning") and morning == "Good morning Anju! Chai pi li?"
@@ -118,7 +118,7 @@ def test_friend_mode_in_skill_replies(friend, monkeypatch, tmp_path):
     handle(ctx, "take a note buy milk")
     assert ctx.voice.last == "Likh liya: buy milk"
     handle(ctx, "hello")
-    assert ctx.voice.last == "Haan Anjali, bata!"
+    assert ctx.voice.last == "Haan Meera, bata!"
     handle(ctx, "goodbye")
     assert ctx.voice.last == "Chal bye, take care!"
 
@@ -129,7 +129,7 @@ def test_professional_mode_in_skill_replies(tmp_path, monkeypatch):
     handle(ctx, "take a note buy milk")
     assert ctx.voice.last == "Noted: buy milk."
     handle(ctx, "goodbye")
-    assert ctx.voice.last == "Goodbye, Anjali. Stay safe!"
+    assert ctx.voice.last == "Goodbye, Meera. Stay safe!"
 
 
 def test_friendly_reminder_and_risky_confirmation(friend, monkeypatch):
@@ -138,7 +138,7 @@ def test_friendly_reminder_and_risky_confirmation(friend, monkeypatch):
     ctx = make_ctx()
     entry = notes.schedule(ctx, 0.01, "pani peena hai")
     time.sleep(0.2)
-    assert ctx.voice.said[-1] == "Oye Anjali! Yaad hai na, pani peena hai"
+    assert ctx.voice.said[-1] == "Oye Meera! Yaad hai na, pani peena hai"
     assert persona.line("confirm_action", action="shut down the laptop") == \
         "Ek sec, shut down the laptop. Pakka kar doon?"
     assert persona.line("confirm_power", action="shut down", delay="15 seconds") == \
@@ -163,7 +163,7 @@ def test_the_ai_talks_like_a_friend_too(friend):
     from jarvis.skills import ai
 
     prompt = ai.system_prompt()
-    assert "close friend from Delhi" in prompt and "never make up facts" in prompt
+    assert "close friend from New Delhi" in prompt and "never make up facts" in prompt
     assert "arre, yaar" in prompt and "use male verb forms for yourself" in prompt
     persona.set_mode(persona.PROFESSIONAL)
     try:

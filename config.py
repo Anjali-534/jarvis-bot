@@ -1,15 +1,102 @@
-"""Configuration loaded from environment variables / .env (never hard-code secrets here)."""
+"""Configuration: environment variables, then settings.json + the Windows Credential Manager, then a legacy .env.
+
+Where your data lives:
+* the installed app: %APPDATA%\\Jarvis (settings.json, memory, notes, contacts, routines, cache, logs, tokens)
+* developer mode (--dev, JARVIS_DEV=1, or running from a checkout that already has .env or data/): the repo's
+  data/ folder, so an existing setup keeps working. The first dev run migrates .env: secrets go to the
+  Credential Manager (and are blanked in .env), everything else to data/settings.json.
+JARVIS_HOME=<folder> uses another data folder (a clean test user, a portable install).
+Never hard-code secrets or personal details here.
+"""
 import os
+import sys
+from datetime import datetime
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
+from jarvis import __version__ as VERSION  # noqa: F401  (one version number, used everywhere)
 
-    load_dotenv(Path(__file__).resolve().parent / ".env")
-except ImportError:  # python-dotenv missing: plain environment variables still work
-    pass
+FROZEN = bool(getattr(sys, "frozen", False))            # the PyInstaller build
+REPO_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(getattr(sys, "_MEIPASS", REPO_DIR))     # bundled files: COMMANDS.md, routines.example.json, icons
+TESTING = os.getenv("JARVIS_TESTING", "").strip() == "1"
 
-BASE_DIR = Path(__file__).resolve().parent
+
+def _dev_mode():
+    flag = os.getenv("JARVIS_DEV", "").strip().lower()
+    if flag in ("1", "true", "yes") or "--dev" in sys.argv:
+        return True
+    if flag in ("0", "false", "no"):
+        return False  # behave like the installed app, even from a checkout
+    if FROZEN or os.getenv("JARVIS_HOME"):
+        return False
+    return (REPO_DIR / ".env").exists() or (REPO_DIR / "data").is_dir()
+
+
+DEV = _dev_mode()
+APPDATA_DIR = Path(os.getenv("APPDATA") or Path.home() / "AppData" / "Roaming") / "Jarvis"
+DATA_DIR = Path(os.getenv("JARVIS_HOME")) if os.getenv("JARVIS_HOME") else (REPO_DIR / "data" if DEV else APPDATA_DIR)
+SETTINGS_FILE = DATA_DIR / "settings.json"
+ENV_FILE = (REPO_DIR / ".env") if DEV else (DATA_DIR / ".env")  # legacy / power-user overrides
+
+
+def migrate_env(env_file=None, data_dir=None):
+    """First dev run: .env -> settings.json (+ secrets -> Credential Manager, blanked in .env). Returns what moved."""
+    from jarvis import settings_store, vault
+
+    env_file, data_dir = Path(env_file or ENV_FILE), Path(data_dir or DATA_DIR)
+    if not env_file.exists() or (data_dir / "settings.json").exists():
+        return None
+    try:
+        from dotenv import dotenv_values
+
+        values = {k: v for k, v in dotenv_values(env_file).items() if v not in (None, "")}
+    except ImportError:
+        return None
+    secrets, settings = {}, {}
+    for key, value in values.items():
+        (secrets if key in vault.SECRET_KEYS else settings)[key] = value
+    moved = []
+    for key, value in secrets.items():
+        try:
+            vault.set(key, value)
+            moved.append(key)
+        except Exception:
+            settings.setdefault("_vault_failed", []).append(key)  # keeps working from .env
+    settings["_migrated_from_env"] = datetime.now().isoformat(timespec="seconds")
+    settings_store.save(settings, data_dir)
+    if moved:  # blank the plain-text copies now that they're in the Credential Manager
+        lines = env_file.read_text(encoding="utf-8").splitlines()
+        out = [f"{line.split('=', 1)[0]}=  # moved to Windows Credential Manager ({vault.service()})"
+               if "=" in line and line.split("=", 1)[0].strip() in moved else line for line in lines]
+        env_file.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return {"settings": sorted(settings), "secrets": moved}
+
+
+def _load():
+    """Fill os.environ (only names the real environment doesn't set) from settings.json, the vault, then .env."""
+    if TESTING:
+        return
+    from jarvis import settings_store, vault
+
+    if DEV:
+        try:
+            migrate_env()
+        except Exception as exc:  # a broken migration must never stop Jarvis starting
+            print(f"[config] .env migration failed: {exc}", file=sys.stderr)
+    for key, value in settings_store.load(DATA_DIR).items():
+        if not key.startswith("_") and value is not None:
+            os.environ.setdefault(key, settings_store.as_env(value))
+    for key, value in vault.all_secrets().items():
+        os.environ.setdefault(key, value)
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(ENV_FILE, override=False)
+    except ImportError:
+        pass
+
+
+_load()
 
 
 def _str(name, default=""):
@@ -32,16 +119,22 @@ def _int(name, default):
 
 
 def _path(name, default):
-    path = Path(os.path.expanduser(_str(name, default)))
-    return path if path.is_absolute() else BASE_DIR / path
+    """A file setting: "data/x" means the data folder; other relative paths are relative to it too."""
+    raw = os.path.expanduser(os.path.expandvars(_str(name, default)))
+    if raw.replace("\\", "/").startswith("data/"):
+        raw = raw[5:]
+    path = Path(raw)
+    return path if path.is_absolute() else DATA_DIR / path
 
 
 ASSISTANT_NAME = _str("ASSISTANT_NAME", "Jarvis")
-USER_NAME = _str("USER_NAME", "Anjali")
-# friend = casual Delhi Hinglish, warm and a bit witty; professional = the polite assistant
+USER_NAME = _str("USER_NAME")  # empty until the setup wizard asks
+# friend = casual and warm, a bit witty; professional = the polite assistant
 PERSONALITY = _str("PERSONALITY", "friend").lower()
 NICKNAME = _str("NICKNAME", USER_NAME)  # what Jarvis calls you in friend mode
-USER_GENDER = _str("USER_GENDER", "female").lower()  # Hindi verb forms when Jarvis talks to you (aa gayi / aa gaya)
+# male / female / neutral: the Hindi verb forms Jarvis uses for you (aa gaya / aa gayi; neutral avoids them)
+USER_GENDER = _str("USER_GENDER", "neutral").lower()
+LANGUAGE = _str("LANGUAGE", "english").lower()  # english, or hinglish (casual Hindi-English in Roman letters)
 
 WAKE_WORD_ENABLED = _bool("WAKE_WORD_ENABLED", True)
 WAKE_WORDS = [w.strip().lower() for w in _str("WAKE_WORDS", "jarvis,hey jarvis,ok jarvis").split(",") if w.strip()]
@@ -56,7 +149,17 @@ TTS_VOICE = _str("TTS_VOICE", "en-IN-PrabhatNeural")  # male; clearest male voic
 TTS_RATE = _str("TTS_RATE", "+5%")                 # edge-tts speaking rate, e.g. -10%, +0%, +15%
 TTS_TIMEOUT = float(_str("TTS_TIMEOUT", "4"))      # seconds to wait for edge-tts before using pyttsx3
 
-DEFAULT_LOCATION = _str("DEFAULT_LOCATION", "New Delhi")
+DEFAULT_LOCATION = _str("DEFAULT_LOCATION")  # your city or pincode (the setup wizard asks); empty = ask
+
+
+def _coordinate(name):
+    try:
+        return float(os.getenv(name, "").strip())
+    except ValueError:
+        return None
+
+
+HOME_LAT, HOME_LON = _coordinate("HOME_LAT"), _coordinate("HOME_LON")  # saved when the wizard checks your city
 COUNTRY_CODE = _str("COUNTRY_CODE", "in")
 WAQI_TOKEN = _str("WAQI_TOKEN")
 RED_ZONE_THRESHOLD = _int("RED_ZONE_THRESHOLD", 200)
@@ -94,9 +197,21 @@ CONTACTS_FILE = _path("CONTACTS_FILE", "data/contacts.json")
 WHATSAPP_SEND_DELAY = _float("WHATSAPP_SEND_DELAY", 3.0)
 
 # VS Code: folders scanned for projects (separate several with ;) and manual aliases
+def _default_project_roots():
+    """Your Desktop and Documents (wherever Windows keeps them, OneDrive included)."""
+    try:
+        from win32com.shell import shell, shellcon
+
+        roots = [shell.SHGetKnownFolderPath(shellcon.FOLDERID_Desktop),
+                 shell.SHGetKnownFolderPath(shellcon.FOLDERID_Documents)]
+    except Exception:
+        roots = [str(Path.home() / "Desktop"), str(Path.home() / "Documents")]
+    return ";".join(roots)
+
+
 PROJECT_ROOTS = [
     Path(os.path.expandvars(os.path.expanduser(p.strip())))
-    for p in _str("PROJECT_ROOTS", r"C:\Users\ADMIN\OneDrive\Desktop\ANJALI").split(";")
+    for p in (_str("PROJECT_ROOTS") or ("" if TESTING else _default_project_roots())).split(";")
     if p.strip()
 ]
 PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")
@@ -161,7 +276,7 @@ GEMINI_API_KEY = _str("GEMINI_API_KEY")
 GEMINI_MODEL = _str("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_ROUTER_TIMEOUT = _float("GEMINI_ROUTER_TIMEOUT", 8.0)  # Gemini is slower at picking an action than Groq
 
-# Live web browsing ("search the web for X", "petrol price in delhi today"): answered by voice from web pages
+# Live web browsing ("search the web for X", "petrol price today"): answered by voice from web pages
 SEARCH_PROVIDER = _str("SEARCH_PROVIDER", "auto").lower()  # auto = tavily, groq, ddgs; or a list, e.g. "ddgs"
 TAVILY_API_KEY = _str("TAVILY_API_KEY")                     # optional: https://app.tavily.com (free tier)
 SEARCH_BUDGET = _float("SEARCH_BUDGET", 8.0)                # seconds for searching + reading pages

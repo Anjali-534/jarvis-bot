@@ -33,7 +33,7 @@ def documents(monkeypatch, tmp_path):
     as_if_on_d_drive(monkeypatch, tmp_path)
     folder = tmp_path / "home" / "Documents"
     folder.mkdir(parents=True)
-    (folder / "Resume_Anjali_2026.pdf").write_bytes(b"%PDF resume")
+    (folder / "Resume_Kavita_2026.pdf").write_bytes(b"%PDF resume")
     (folder / "holiday video.mp4").write_bytes(b"x")
     os.truncate(folder / "holiday video.mp4", 60 * 1024 * 1024)  # 60 MB, sparse
     (folder / "server.env").write_text("TOKEN=abc")
@@ -47,10 +47,10 @@ def documents(monkeypatch, tmp_path):
 def test_send_me_my_resume_asks_then_sends_the_document(paired, documents):
     paired.on_message(ME, "send me my resume")
     chat, question, token = paired.transport.wait_question()
-    assert "Resume_Anjali_2026.pdf" in question and "in Documents" in question
+    assert "Resume_Kavita_2026.pdf" in question and "in Documents" in question
     paired.on_button(ME, f"{token}:yes")
     paired.join()
-    assert paired.transport.documents == [(ME, str(documents / "Resume_Anjali_2026.pdf"), "Resume_Anjali_2026.pdf")]
+    assert paired.transport.documents == [(ME, str(documents / "Resume_Kavita_2026.pdf"), "Resume_Kavita_2026.pdf")]
     assert "Sent" in actions.log_path().read_text(encoding="utf-8")
 
 

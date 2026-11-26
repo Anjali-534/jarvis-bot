@@ -66,10 +66,10 @@ def test_connect_without_client_id_prints_steps(caplog):
 
 def test_connect_runs_pkce_flow(monkeypatch):
     monkeypatch.setattr(config, "SPOTIFY_CLIENT_ID", "abc")
-    monkeypatch.setattr(spotify, "run_flow", lambda: "Anjali")
+    monkeypatch.setattr(spotify, "run_flow", lambda: "Meera")
     ctx = make_ctx()
     handle(ctx, "connect my spotify account")
-    assert ctx.voice.last == "Spotify is connected, Anjali. Try: play Believer on Spotify."
+    assert ctx.voice.last == "Spotify is connected, Meera. Try: play Believer on Spotify."
 
 
 # ---------------------------------------------------------------- connected

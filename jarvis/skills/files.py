@@ -1,4 +1,4 @@
-"""Find, open and tidy your files by name: "open my resume", "find the bogie pitch deck", "zip the jarvis folder".
+"""Find, open and tidy your files by name: "open my resume", "find the acme pitch deck", "zip the jarvis folder".
 
 A background index keeps the NAMES and modified dates (never the contents) of everything in Desktop, Documents,
 Downloads, Pictures, Videos, Music, OneDrive and PROJECT_ROOTS, skipping node_modules, .git, virtualenvs and
@@ -228,13 +228,13 @@ _SPLIT = re.compile(r"[^a-z0-9]+")
 
 
 def name_words(text):
-    """'BogiePitchDeck_v2' -> ['bogie', 'pitch', 'deck', 'v', '2']"""
+    """'AcmePitchDeck_v2' -> ['acme', 'pitch', 'deck', 'v', '2']"""
     text = _DIGITS.sub(" ", _CAMEL.sub(r"\1 \2", text))
     return [w for w in _SPLIT.split(text.lower()) if w]
 
 
 def parse_query(query):
-    """'the bogie pitch deck' -> (['bogie', 'pitch'], {'.pptx', ...}, ['pitch', 'deck'], wants_folder)."""
+    """'the acme pitch deck' -> (['acme', 'pitch'], {'.pptx', ...}, ['pitch', 'deck'], wants_folder)."""
     text = (query or "").lower().strip(" .?!")
     text = re.sub(r"\s+dot\s+(\w{2,4})$", r".\1", text)       # "main dot py"
     wants_folder = bool(re.search(r"\bfolders?\b", text))
@@ -514,7 +514,7 @@ def downloads_today(ctx, command, match):
 @skill("open file", r"^(?:please\s+)?(?:open|launch)\s+(?:up\s+)?(.+)$",
        rf"{hi.LEAD}{hi.MY}(.+?){hi.OPEN}$",
        category="files", help=["open my resume", "meri resume khol"],
-       tool="open_file", params={"name": "file name the user said, e.g. my resume, bogie pitch deck"},
+       tool="open_file", params={"name": "file name the user said, e.g. my resume, acme pitch deck"},
        command="open my {name} file")
 def open_file(ctx, command, match):
     from jarvis.skills import apps, app_index
@@ -545,8 +545,8 @@ def open_file(ctx, command, match):
 @skill("find file", r"^(?:please\s+)?(?:find|locate|look for|search my (?:laptop|pc|computer|files) for|where(?:'s| is) my)\s+"
                     r"(?:me\s+)?(.+?)(?:\s+(?:on|in)\s+my\s+(?:laptop|pc|computer|files))?\??$",
        rf"{hi.LEAD}{hi.MY}(.+?){hi.FIND}$", rf"{hi.LEAD}{hi.MY}(.+?)\s+kahan\s+(?:hai|h|padi hai|pada hai)\??$",
-       category="files", help=["find the bogie pitch deck", "where is my resume"],
-       tool="find_file", params={"name": "file or folder name, e.g. bogie pitch deck"}, command="find my {name} file")
+       category="files", help=["find the acme pitch deck", "where is my resume"],
+       tool="find_file", params={"name": "file or folder name, e.g. acme pitch deck"}, command="find my {name} file")
 def find_file(ctx, command, match):
     target = match.group(1).strip(" .?!")
     if re.search(r"\bout\b|^(?:a|an|some|me a|nearby|good)\b|\b(?:near me|nearby|online|restaurant|job|flight)\b", target):

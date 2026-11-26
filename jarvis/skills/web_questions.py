@@ -1,6 +1,6 @@
 """The fast path to a web answer: obvious "look it up" questions skip the AI routing call.
 
-"petrol price in delhi today", "who won the match yesterday", "latest iphone", "sone ka bhav aaj kya hai" are
+"petrol price in mumbai today", "who won the match yesterday", "latest iphone", "sone ka bhav aaj kya hai" are
 matched by regex and searched straight away (skills/browse.py). This module is registered after weather, AQI
 and news, so "weather today" and "aqi today" still reach those skills, and before Wikipedia and the AI chat,
 so "who is the current prime minister" is searched instead of answered from old knowledge. Anything about
@@ -27,7 +27,7 @@ _ASIDE = re.compile(r"\b(?:remind|reminder|alarm|timer|note|todo|to-do|schedule|
 
 
 @skill("web question", rf"\b(?:{_LIVE})\b", category="web",
-       help=["petrol price in Delhi today", "who won the cricket match yesterday", "latest iPhone"])
+       help=["petrol price in Mumbai today", "who won the cricket match yesterday", "latest iPhone"])
 def web_question(ctx, command, match):
     question = _FILLER.sub("", command).strip(" ?.!")
     if not question or _PERSONAL.search(question) or _ASIDE.search(question) or len(question.split()) < 2:

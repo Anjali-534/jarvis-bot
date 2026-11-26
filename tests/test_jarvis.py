@@ -60,11 +60,11 @@ ROUTES = [
     ("call mom on whatsapp", "whatsapp call"), ("add contact riya 9876543210", "whatsapp add contact"),
     ("open whatsapp", "open"),
     # vs code
-    ("open bogie in vs code", "vscode open project"), ("open bogie project", "vscode open project"),
+    ("open acme in vs code", "vscode open project"), ("open acme project", "vscode open project"),
     ("work on jarvis", "vscode open project"), ("open vs code here", "vscode new window"),
     ("new vs code window", "vscode new window"), ("open file main.py in jarvis", "vscode open file"),
     ("list my projects", "vscode list projects"), ("rescan projects", "vscode rescan"),
-    ("git status of jarvis", "git status"), ("pull jarvis", "git pull"), ("run bogie backend", "run project"),
+    ("git status of jarvis", "git status"), ("pull jarvis", "git pull"), ("run acme backend", "run project"),
     ("open vs code", "open"),
     # gmail
     ("connect google", "connect google"), ("disconnect google", "disconnect google"),
@@ -247,16 +247,19 @@ def test_safe_outside_advice(monkeypatch):
 
 
 def test_red_zones_open_meteo(monkeypatch):
-    values = [100.0, 150.0, 40.0, 200.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0]
+    # the city centre, then 8 directions at about 10 km, then 8 at about 20 km (around the user's own city)
+    values = [100.0, 150.0, 40.0, 200.0] + [30.0] * 13
     get_json, calls = fake_air(values)
     monkeypatch.setattr(http, "get_json", get_json)
     ctx = make_ctx()
     handle(ctx, "red zones")
-    assert len(calls) == 1  # all 10 NCR points in one request
-    assert len(calls[0][1]["latitude"].split(",")) == 10
+    assert len(calls) == 1  # all 17 points in one request
+    assert len(calls[0][1]["latitude"].split(",")) == 17
     reply = ctx.voice.last
-    assert reply.index("Anand Vihar") < reply.index("Rohini") < reply.index("Central Delhi")
-    assert "Dwarka" not in reply
+    assert reply.startswith("Today's red zones around New Delhi are:")
+    assert reply.index("East of New Delhi (about 10 km)") < reply.index("North of New Delhi (about 10 km)") \
+        < reply.index("Central New Delhi")
+    assert "North-east" not in reply
 
 
 def test_red_zones_none_red_names_worst(monkeypatch):
@@ -264,7 +267,8 @@ def test_red_zones_none_red_names_worst(monkeypatch):
     monkeypatch.setattr(http, "get_json", get_json)
     ctx = make_ctx()
     handle(ctx, "red zones")
-    assert "None of" in ctx.voice.last and "Rohini" in ctx.voice.last
+    assert "None of the areas around New Delhi" in ctx.voice.last
+    assert "North of New Delhi (about 10 km)" in ctx.voice.last  # the worst one
 
 
 def test_red_zones_waqi(monkeypatch):
@@ -357,9 +361,9 @@ def test_reminder_fires():
     handle(ctx, "remind me in 1 second to stretch")
     assert "stretch" in ctx.voice.last
     deadline = time.time() + 4
-    while time.time() < deadline and "Reminder, Anjali: stretch" not in ctx.voice.said:
+    while time.time() < deadline and "Reminder, Meera: stretch" not in ctx.voice.said:
         time.sleep(0.05)
-    assert "Reminder, Anjali: stretch" in ctx.voice.said
+    assert "Reminder, Meera: stretch" in ctx.voice.said
     assert ctx.state["reminders"] == []
 
 

@@ -4,6 +4,13 @@ Jarvis is a voice assistant for a Windows laptop, written in Python 3.13. It sta
 
 Each feature lives in its own **skill file**, so new integrations (WhatsApp, VS Code and so on) can be added without touching the rest.
 
+## Where your data lives
+
+* **Installed app:** everything is in `%APPDATA%\Jarvis`: `settings.json`, memory, notes, contacts, routines, cache, logs and sign-in tokens.
+* **Developer checkout** (`python main.py --dev`, `JARVIS_DEV=1`, or a checkout that already has `.env` or `data\`): the repo's `data\` folder, so an existing setup keeps working. The first run migrates `.env`: API keys and tokens move into the Windows Credential Manager (and are blanked in `.env`), and the other settings go to `data\settings.json`.
+* **Secrets** (AI keys, WAQI, Tavily, Telegram) live in the **Windows Credential Manager** (Control Panel > Credential Manager > Windows Credentials, entries named `Jarvis`), never in plain text.
+* Precedence: real environment variables, then `settings.json` and the Credential Manager, then `.env`. `JARVIS_HOME=<folder>` uses another data folder.
+
 ## Setup (Windows)
 
 ```powershell
@@ -21,16 +28,16 @@ Then edit `.env`. Every setting has a default, so these are all optional:
 | `AI_API_KEY` | Lets Jarvis answer any question, using Gemini's native API or any OpenAI-compatible API (free options below). |
 | `AI_PROVIDER` | `gemini` or `openai`. If empty, it's `gemini` when `AI_BASE_URL` is a `generativelanguage.googleapis.com` URL, otherwise `openai`. |
 | `WAQI_TOKEN` | A free token from <https://aqicn.org/data-platform/token/>. Red zones then come from real CPCB monitoring stations. |
-| `DEFAULT_LOCATION` | Used until you tell Jarvis your area. Defaults to New Delhi. |
-| `PERSONALITY`, `NICKNAME` | `friend` (default: talks like a close Delhi friend, in casual Hinglish) or `professional`, and what Jarvis calls you. See [Personality and voice](#personality-and-voice). |
+| `DEFAULT_LOCATION` | Your city or pincode, used until you tell Jarvis your area. Empty by default: Jarvis asks. |
+| `PERSONALITY`, `NICKNAME`, `LANGUAGE` | `friend` (default: casual and warm) or `professional`; what Jarvis calls you; `english` (default) or `hinglish` (the friend's fixed lines are Hinglish). See [Personality and voice](#personality-and-voice). |
 | `TTS_ENGINE`, `TTS_VOICE`, `TTS_RATE` | `edge` (default: Microsoft's free neural voices, needs internet) or `pyttsx3` (offline Windows voice); the neural voice (default `en-IN-PrabhatNeural`, male) and its speed. |
-| `USER_GENDER` | `female` (default) or `male`: the Hindi verb forms Jarvis uses for you ("tu kaisi hai?" / "tu kaisa hai?"). |
+| `USER_GENDER` | `neutral` (default: avoids gendered verb forms about you), `female` or `male`: the Hindi verb forms Jarvis uses for you ("tu kaisi hai?" / "tu kaisa hai?"). |
 | `VOICE_NAME`, `VOICE_RATE` | The offline fallback voice: part of a Windows voice name (`zira`, `david`, `heera`...) and its speed. |
 | `WAKE_WORDS`, `FOLLOW_UP_SECONDS` | The wake phrases, and how long you can keep talking without one after a reply. |
 | `WHATSAPP_SEND_DELAY` | Seconds to wait for WhatsApp to open a chat before pressing Enter (default 3). |
 | `SPOTIFY_CLIENT_ID` | Lets Jarvis control Spotify (see [Connecting Google and Spotify](#connecting-google-and-spotify)). |
 | `CALENDAR_REMINDERS`, `CALENDAR_REMINDER_MINUTES` | Spoken reminder and toast before each calendar event (on by default, 10 minutes before). |
-| `PROJECT_ROOTS` | Folders to scan for code projects, separated by `;`. Defaults to `C:\Users\ADMIN\OneDrive\Desktop\ANJALI`. |
+| `PROJECT_ROOTS` | Folders to scan for code projects, separated by `;`. Defaults to your Desktop and Documents. |
 
 Free AI keys:
 

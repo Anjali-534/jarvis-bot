@@ -65,7 +65,7 @@ _PREFERENCE = re.compile(r"\b(?:like|likes|love|loves|hate|hates|prefer|prefers|
                          r"nahi pasand|enjoy|allergic to|can't stand|don't like|dont like|vegetarian|vegan)\b",
                          re.IGNORECASE)
 _WORK = re.compile(r"\b(?:work|office|project|client|boss|manager|team|deadline|meeting|job|naukri|salary|"
-                   r"company|startup|interview|exam|college|class|assignment|standup|sprint|bogie)\b", re.IGNORECASE)
+                   r"company|startup|interview|exam|college|class|assignment|standup|sprint)\b", re.IGNORECASE)
 _PEOPLE = re.compile(r"\b(?:mom|mummy|mumma|maa|dad|papa|bhai|bhaiya|didi|sister|brother|friend|dost|wife|husband|"
                      r"boyfriend|girlfriend|bf|gf|uncle|aunty|aunt|cousin|nani|nana|dadi|dada|colleague|"
                      r"[a-z]+'s)\b", re.IGNORECASE)

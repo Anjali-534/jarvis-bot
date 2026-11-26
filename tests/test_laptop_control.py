@@ -326,8 +326,8 @@ def test_copy_that_copies_the_last_answer(desk):
 def make_tree(root):
     now = time.time()
     layout = {
-        "Documents/Resume_Anjali_2026.pdf": 2, "Documents/old resume draft.docx": 400,
-        "Documents/Bogie Pitch Deck.pptx": 3, "Documents/bogie pitch deck notes.txt": 3,
+        "Documents/Resume_Kavita_2026.pdf": 2, "Documents/old resume draft.docx": 400,
+        "Documents/Acme Pitch Deck.pptx": 3, "Documents/acme pitch deck notes.txt": 3,
         "Downloads/invoice-nov.pdf": 0.1, "Downloads/setup.exe": 0.05, "Downloads/photo.jpg": 30,
         "Desktop/projects/jarvis/main.py": 1, "Desktop/projects/jarvis/node_modules/left-pad/index.js": 1,
         "Desktop/projects/jarvis/.git/HEAD": 1, "Desktop/projects/jarvis/.venv/pyvenv.cfg": 1,
@@ -377,7 +377,7 @@ def test_index_skips_node_modules_git_and_venvs_and_never_reads_contents(home, m
 
     monkeypatch.setattr("builtins.open", no_reading)
     names = {Path(e.path).name for e in files.scan(list(files.index_roots()))}
-    assert {"main.py", "Resume_Anjali_2026.pdf"} <= names
+    assert {"main.py", "Resume_Kavita_2026.pdf"} <= names
     assert not names & {"index.js", "HEAD", "pyvenv.cfg", "lib.py", "node_modules", ".git", ".venv", "env2"}
 
 
@@ -395,35 +395,35 @@ def test_index_refuses_system_folders(tmp_path, monkeypatch):
 
 
 def test_ranking_prefers_name_type_and_recency(home):
-    ranked = files.rank("the bogie pitch deck")
-    assert ranked[0][1].name == "Bogie Pitch Deck.pptx"
+    ranked = files.rank("the acme pitch deck")
+    assert ranked[0][1].name == "Acme Pitch Deck.pptx"
     ranked = files.rank("my resume")
-    assert ranked[0][1].name == "Resume_Anjali_2026.pdf"  # newer, and a document
-    assert files.rank("cv")[0][1].name == "Resume_Anjali_2026.pdf"  # cv = resume
+    assert ranked[0][1].name == "Resume_Kavita_2026.pdf"  # newer, and a document
+    assert files.rank("cv")[0][1].name == "Resume_Kavita_2026.pdf"  # cv = resume
     assert files.rank("invoice")[0][1].name == "invoice-nov.pdf"
 
 
 def test_open_my_resume_and_hinglish(home):
     ctx = make_ctx(["the first one"])
     assert handle(ctx, "open my resume") == "open file"
-    assert home["opened"] == ["Resume_Anjali_2026.pdf"]
+    assert home["opened"] == ["Resume_Kavita_2026.pdf"]
     assert handle(make_ctx(["first"]), "meri resume khol") == "open file"
-    assert home["opened"][-1] == "Resume_Anjali_2026.pdf"
+    assert home["opened"][-1] == "Resume_Kavita_2026.pdf"
 
 
 def test_several_matches_read_top_3_and_ask(home):
     ctx = make_ctx(["none"])
     handle(ctx, "open my resume")
-    assert "1, Resume_Anjali_2026.pdf in Documents" in ctx.voice.said[0]
+    assert "1, Resume_Kavita_2026.pdf in Documents" in ctx.voice.said[0]
     assert "2, old resume draft.docx in Documents" in ctx.voice.said[0]
     assert home["opened"] == []
 
 
 def test_find_offers_to_open(home):
     ctx = make_ctx(["yes"])
-    assert handle(ctx, "find the bogie pitch deck") == "find file"
-    assert ctx.voice.said[0].startswith("Found Bogie Pitch Deck.pptx in Documents, changed 3 days ago")
-    assert home["opened"] == ["Bogie Pitch Deck.pptx"]
+    assert handle(ctx, "find the acme pitch deck") == "find file"
+    assert ctx.voice.said[0].startswith("Found Acme Pitch Deck.pptx in Documents, changed 3 days ago")
+    assert home["opened"] == ["Acme Pitch Deck.pptx"]
 
 
 def test_latest_download_and_programs_ask_first(home):

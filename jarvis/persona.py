@@ -1,7 +1,9 @@
-"""How Jarvis talks: PERSONALITY=friend (casual Delhi Hinglish, warm, a bit witty) or professional.
+"""How Jarvis talks: PERSONALITY=friend (casual, warm, a bit witty) or professional, in LANGUAGE=english or
+hinglish. The fixed friend lines are Hinglish, so they're used when the language is Hinglish; an English friend
+gets the plain English lines with a casual AI tone.
 
-    persona.line("done")                      -> "Ho gaya!" / "Done, yaar" / "Lo, kar diya" (friend)
-    persona.line("reminder", message="...")   -> "Oye Anjali! Yaad hai na, ..."
+    persona.line("done")                      -> "Ho gaya!" / "Done, yaar" / "Lo, kar diya" (friend, Hinglish)
+    persona.line("reminder", message="...")   -> "Oye Meera! Yaad hai na, ..."
     persona.restyle("Okay, I've kept your notes.") -> "Theek hai, I've kept your notes." (friend; other replies)
 
 Every phrase has 3-5 variants per personality, picked at random without saying the same one twice in a row.
@@ -10,7 +12,8 @@ the session (set_mode); PERSONALITY and NICKNAME in .env set the default.
 
 Hindi grammar follows both genders. Jarvis's verbs follow the voice (TTS_VOICE; a male voice says "main kar
 dunga", "aa gaya", a female one "kar dungi", "aa gayi"), and the user's follow USER_GENDER ("tu kaisi hai?",
-"thak gayi kya?" for female; "kaisa", "thak gaya" for male). Never write a gendered verb form literally in a
+"thak gayi kya?" for female; "kaisa", "thak gaya" for male; neutral avoids gendered forms about the user: a
+variant without {u_a}/{u_ta} is chosen, or the NEUTRAL wording). Never write a gendered verb form literally in a
 phrase; use the placeholders:
     Jarvis:   {ta} ta/ti (karta hoon)   {ga} ga/gi (dunga)   {a} a/i (gaya, raha)
     the user: {u_a} a/i (gayi, rahi, kaisi)   {u_ta} ta/ti (sakti)
@@ -23,6 +26,9 @@ from datetime import datetime
 import config
 
 FRIEND, PROFESSIONAL = "friend", "professional"
+# Gender-neutral wording for phrases whose every variant has a gendered form about the user (none today; a test
+# checks that every phrase still has a neutral variant or an entry here).
+NEUTRAL = {}
 _session_mode = None        # "talk professionally" / "friend mode" for this session
 _last = {}                  # key -> the variant said last time, so it doesn't repeat
 choose = random.choice      # tests pin this to the first variant
@@ -393,8 +399,8 @@ FEELINGS = {name: re.compile(pattern) for name, pattern in _FEELINGS.items()}
 
 # ---------------------------------------------------------------- settings
 def mode():
-    chosen = _session_mode or (config.PERSONALITY or FRIEND).lower()
-    return PROFESSIONAL if chosen.startswith("pro") or chosen == "formal" else FRIEND
+    """FRIEND (the Hinglish friend lines) only for a friend personality in Hinglish; otherwise the English lines."""
+    return FRIEND if casual() and hinglish() else PROFESSIONAL
 
 
 def set_mode(new_mode):
@@ -407,7 +413,7 @@ def is_friend():
 
 
 def nickname():
-    return (config.NICKNAME or config.USER_NAME) if is_friend() else config.USER_NAME
+    return ((config.NICKNAME or config.USER_NAME) if casual() else config.USER_NAME) or ""
 
 
 def voice_is_female():
@@ -415,8 +421,35 @@ def voice_is_female():
     return not any(name in voice.lower() for name in MALE_VOICES)
 
 
+def user_gender():
+    gender = (config.USER_GENDER or "neutral").lower()
+    return "female" if gender.startswith("f") else "male" if gender.startswith("m") else "neutral"
+
+
 def user_is_female():
-    return (config.USER_GENDER or "female").lower().startswith("f")
+    return user_gender() == "female"
+
+
+def user_is_neutral():
+    return user_gender() == "neutral"
+
+
+def hinglish():
+    return (config.LANGUAGE or "english").lower().startswith("hi")
+
+
+def casual():
+    """The friend personality (in either language): the AI talks casually."""
+    chosen = _session_mode or (config.PERSONALITY or FRIEND).lower()
+    return not (chosen.startswith("pro") or chosen == "formal")
+
+
+def city():
+    """The user's city, from DEFAULT_LOCATION ("Rohini, Mumbai" -> "Mumbai"), or ''."""
+    place = (config.DEFAULT_LOCATION or "").strip()
+    if not place or place.isdigit():
+        return ""
+    return place.split(",")[-1].strip()
 
 
 def _verb_forms():
@@ -441,7 +474,15 @@ def _pick(key, options):
 
 def variants(key, which=None):
     entry = PHRASES[key]
-    return entry.get(which or mode()) or entry[PROFESSIONAL]
+    options = entry.get(which or mode()) or entry[PROFESSIONAL]
+    if user_is_neutral():  # no gendered verb about the user: the variants without {u_a}/{u_ta}, or NEUTRAL's
+        plain = [o for o in options if "{u_" not in o]
+        options = plain or NEUTRAL.get(key, {}).get(which or mode()) or entry[PROFESSIONAL]
+    return options
+
+
+_EMPTY_NAME = [(re.compile(r"\s+([,.!?])"), r"\1"), (re.compile(r",\s*([.!?])"), r"\1"),
+               (re.compile(r"^\s*,\s*"), ""), (re.compile(r"\s{2,}"), " ")]
 
 
 def line(key, **values):
@@ -449,7 +490,13 @@ def line(key, **values):
     template = _pick(key, variants(key))
     fields = {"name": nickname(), "assistant": config.ASSISTANT_NAME, "part_of_day": part_of_day(), **_verb_forms(),
               **values}
-    return template.format(**fields)
+    text = template.format(**fields)
+    if not fields["name"] and "{name}" in template:  # no name set yet: "Good morning, !" -> "Good morning!"
+        for pattern, new in _EMPTY_NAME:
+            text = pattern.sub(new, text)
+        text = text.strip()
+        text = text[:1].upper() + text[1:]
+    return text
 
 
 def is_line(key, text):
@@ -510,16 +557,29 @@ def restyle(text):
 
 
 # ---------------------------------------------------------------- the AI's style
+def _who():
+    return nickname() or "the user"
+
+
 def grammar_rule():
     """How Hindi verbs agree, for the AI: Jarvis's own gender and the user's."""
     me = "male" if not voice_is_female() else "female"
-    you = "female" if user_is_female() else "male"
     mine = ("'main kar dunga', 'main aa gaya', 'samajh gaya', 'bata dunga'" if me == "male"
             else "'main kar dungi', 'main aa gayi', 'samajh gayi', 'bata dungi'")
+    rule = f"Hindi grammar: you are {me}, so use {me} verb forms for yourself ({mine}); "
+    if user_is_neutral():
+        return rule + (f"{_who()} prefers gender-neutral address: never use gendered verb forms about them; rephrase "
+                       "instead ('sab theek?', 'thakan ho rahi hai?', 'khana ho gaya?'). ")
+    you = user_gender()
     yours = ("'tu kaisi hai?', 'thak gayi kya?', 'tune khana kha liya?', 'aa gayi!'" if you == "female"
              else "'tu kaisa hai?', 'thak gaya kya?', 'tune khana kha liya?', 'aa gaya!'")
-    return (f"Hindi grammar: you are {me}, so use {me} verb forms for yourself ({mine}); {nickname()} is {you}, "
-            f"so address {'her' if you == 'female' else 'him'} with {you} forms ({yours}). ")
+    return rule + (f"{_who()} is {you}, so address {'her' if you == 'female' else 'him'} with {you} forms "
+                   f"({yours}). ")
+
+
+def _address():
+    """'tu kaisi hai' / 'tu kaisa hai' / neutral, for the short routing prompt."""
+    return {"female": "tu kaisi hai", "male": "tu kaisa hai"}.get(user_gender(), "neutral, e.g. 'sab theek?'")
 
 
 GOOD_FRIEND = (
@@ -544,24 +604,23 @@ LANGUAGE_RULE = ("Match the user's language: English question -> English answer;
 def ai_style(brief=False):
     """Added to the AI's system prompts. brief: the short version for the routing call, which is sent with the whole
     tool list on every command (Groq's free tier allows 7,000 input tokens a minute)."""
-    if not is_friend():
+    if not casual():
         return ("Tone: polite, clear and professional, like a capable personal assistant. " + LANGUAGE_RULE
                 + (GOOD_FRIEND_BRIEF if brief else GOOD_FRIEND.replace("Be a good friend: caring and casual, but",
                                                                         "Be caring, and")))
+    friend_of = f"{_who()}'s close friend" + (f" from {city()}" if city() else "")
     if brief:
         me = "female" if voice_is_female() else "male"
-        you = "female" if user_is_female() else "male"
-        return (f"{nickname()}'s close Delhi friend: casual, warm, 1-3 sentences, real opinions with reasons; "
+        return (f"{friend_of}: casual, warm, 1-3 sentences, real opinions with reasons; "
                 "match their language (English, or Hinglish in Roman letters). "
-                f"You're {me} ({'main kar dunga' if me == 'male' else 'main kar dungi'}), {nickname()} is {you} "
-                f"({'tu kaisi hai' if you == 'female' else 'tu kaisa hai'}). "
+                f"You're {me} ({'main kar dunga' if me == 'male' else 'main kar dungi'}); {_who()}: {_address()}. "
                 + GOOD_FRIEND_BRIEF + "Unsure? Say so ('Pakka nahi pata yaar'); never make up facts. ")
     return (
-        f"Tone: talk like {nickname()}'s close friend from Delhi, not a formal assistant. Casual and warm, a bit "
+        f"Tone: talk like {friend_of}, not a formal assistant. Casual and warm, a bit "
         "witty; light teasing is fine, never rude. Short and natural by default (1 to 3 sentences), like a friend "
         "talking, not a manual; more detail only when asked ('explain karo', 'detail mein bata'). "
         + LANGUAGE_RULE +
-        "In Hinglish, talk the way Delhi friends do (arre, yaar, chal, haan bata, sahi hai) without overdoing the "
+        "In Hinglish, talk the way Indian friends do (arre, yaar, chal, haan bata, sahi hai) without overdoing the "
         "slang; in English, keep the same casual, warm tone in plain English. "
         + grammar_rule() +
         "Opinions ('tu kya sochta hai?'): give a real take with your reasons, don't dodge; on serious topics stay "

@@ -41,7 +41,7 @@ def git(path, *args, timeout=60):
 
 # ---------------------------------------------------------------- project registry
 def spoken(name):
-    """'bogie-admin_panel' -> 'bogie admin panel'."""
+    """'acme-admin_panel' -> 'acme admin panel'."""
     return re.sub(r"\s+", " ", re.sub(r"[-_.]+", " ", name)).strip().lower()
 
 
@@ -85,7 +85,8 @@ def load_aliases():
     except json.JSONDecodeError:
         log.warning(f"[vscode] {path} is not valid JSON")
         return {}
-    return {spoken(k): Path(os.path.expandvars(os.path.expanduser(v))) for k, v in data.items()}
+    return {spoken(k): Path(os.path.expandvars(os.path.expanduser(v))) for k, v in data.items()
+            if not k.startswith("_")}  # "_help" notes in the file aren't projects
 
 
 def get_projects(refresh=False):
@@ -107,7 +108,7 @@ def _score(query, name):
     q_words, n_words = query.split(), name.split()
     ratio = max(difflib.SequenceMatcher(None, query, name).ratio(),
                 difflib.SequenceMatcher(None, query.replace(" ", ""), name.replace(" ", "")).ratio())
-    # every spoken word starts a word of the name, in order ("bogie admin" -> "bogie admin panel")
+    # every spoken word starts a word of the name, in order ("acme admin" -> "acme admin panel")
     it = iter(n_words)
     if q_words and all(any(n.startswith(q) for n in it) for q in q_words):
         return 0.85 + 0.15 * ratio
@@ -314,7 +315,7 @@ def git_pull(ctx, command, match):
 
 
 @skill("run project", r"^(?:please\s+)?(?:run|start|launch)\s+(?:the\s+|my\s+)?(.+?)\s+(?:project|app|server|dev server)$",
-       r"^(?:please\s+)?run\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['run bogie backend'], params={"project": "project name"}, command="run {project}", risky=True, confirms=True)
+       r"^(?:please\s+)?run\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['run acme backend'], params={"project": "project name"}, command="run {project}", risky=True, confirms=True)
 def run_project(ctx, command, match):
     found = resolve_project(ctx, match.group(1), required=False)
     if found is None:
@@ -332,7 +333,7 @@ def run_project(ctx, command, match):
 
 @skill("vscode open project", rf"^(?:please\s+)?open\s+(?:the\s+|my\s+)?(?:project\s+)?(.+?)\s+(?:project\s+|folder\s+)?in\s+{VSC}$",
        r"^(?:please\s+)?open\s+(?:the\s+|my\s+)?(.+?)\s+project$", r"^(?:please\s+)?open\s+project\s+(.+)$",
-       r"^(?:let's\s+|i want to\s+)?work on\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['open jarvis in VS Code', 'work on bogie backend'])
+       r"^(?:let's\s+|i want to\s+)?work on\s+(?:the\s+|my\s+)?(.+)$", category='vs code', help=['open jarvis in VS Code', 'work on acme backend'])
 def open_project(ctx, command, match):
     name, path = resolve_project(ctx, match.group(1))
     shell(f'code "{path}"')
