@@ -286,6 +286,17 @@ Reminders only fire while Jarvis is running.
 - "Lock the laptop"
 - "Shut down the laptop", "restart in 10 minutes", "turn off my computer" (always asks first), "cancel shutdown"
 - "Put the laptop to sleep" (asks first)
+- "What's playing" (any app: Spotify, YouTube in Chrome, VLC...), "pause", "play", "next", "previous"
+
+**Full laptop control** (Windows; see [Laptop control](#laptop-control) for the safety rules)
+- Apps: "open Figma" (any installed app, fuzzy: "what's app", "vs code"), "close Notepad", "is Chrome open?", "list open apps", "restart Spotify", "close all apps", "refresh apps"
+- Windows: "switch to Chrome", "minimize / maximize / restore Notepad", "minimize everything", "snap Chrome left", "close this window", "full screen", "move this to the other screen", "new desktop", "next desktop", "what's on my screen right now"
+- Typing: "type hello comma see you at 5", "type in terminal git status", "press enter", "select all", "copy", "paste", "undo", "save", "new tab", "reopen tab", "go back", "refresh", "zoom in", "scroll down", "read my clipboard", "copy that"
+- Files: "open my resume", "find the bogie pitch deck", "open the latest download", "show files I downloaded today", "open my Downloads folder", "create folder Receipts on desktop", "rename notes.txt to ideas.txt", "move resume to Documents", "zip the jarvis folder", "delete old notes.txt" (Recycle Bin), "undo that"
+- Settings: "turn off wifi", "wifi status", "connect to Home WiFi", "Bluetooth on", "is airplane mode on?", "dark mode on", "night light", "do not disturb on", "battery saver on", "best performance mode", "volume 30", "Spotify volume 30", "mute Chrome", "mute my mic", "switch to headphones", "empty the recycle bin", "clear temp files", "open display / sound / bluetooth / update / privacy settings"
+- Routines: "start work mode", "movie mode", "break time", "create a routine called study time", "list my routines", "delete routine study time", "every weekday at 9:30 start work mode"
+- "What did you just do", "undo that"
+- Hinglish works too: "yaar wifi band kar de", "chrome pe switch kar", "meri resume khol", "dark mode laga do", "laptop band kar do"
 
 **Everything else**
 - "What time is it", "what's the date", "who are you", "how are you", "thank you"
@@ -297,6 +308,28 @@ Reminders only fire while Jarvis is running.
 - Anything else goes to the AI (needs `AI_API_KEY`; without one, Jarvis searches the web): questions, advice, opinions ("tu kya sochta hai, mujhe MBA karna chahiye?"), explanations ("explain recursion simply"), and follow-ups ("aur?", "kyun?"). Things it can't do get an alternative ("order me a pizza" -> "Swiggy khol doon?"). "Forget our conversation" clears its memory.
 - Speak Hindi or Hinglish to the AI and it replies in Hinglish written in Roman letters, which every voice can read.
 - "Switch to Hindi" makes speech recognition listen for Hindi (`hi-IN`), and "switch to English" switches back. This lasts for the session only. In Hindi mode Google writes what you say in Devanagari, and `jarvis/translit.py` rewrites commands into English before routing: "क्रोम खोलो" becomes "open chrome". Messages and notes keep your exact words, and anything that isn't a command goes to the AI unchanged. See the Hindi section of [COMMANDS.md](COMMANDS.md).
+
+## Laptop control
+
+Jarvis can drive the whole laptop, Alexa-style. Each area is its own skill file in `jarvis/skills/` (`app_index`, `windows`, `keyboard_control`, `files`, `settings_control`, `media_session`, `routines`, `history`), and the low-level Windows calls live in `jarvis/desktop.py`, so the tests fake them all.
+
+**Apps.** Jarvis indexes every installed app: Start-menu shortcuts (yours and all users'), Store apps (`Get-StartApps`, launched through `shell:AppsFolder\<AppID>`) and the built-in list. The index is cached in `data/app_index.json`, rebuilt once a day in the background, and rebuilt on "refresh apps". "Open X" fuzzy-matches it and handles speech slips ("what's app", "spotfy", "calculater"). If 2 or 3 apps are equally close ("visual studio": VS Code or Visual Studio 2022?), it asks which one. Typing the name into the Start menu is only the last resort.
+
+**Files.** A background index keeps the *names and modified dates* of everything in Desktop, Documents, Downloads, Pictures, Videos, Music, OneDrive and `PROJECT_ROOTS` (never the contents). It skips `node_modules`, `.git`, virtualenvs and AppData, and is rebuilt every 6 hours (`FILE_INDEX_HOURS`). Matching is fuzzy: "cv" finds a resume, and "deck" prefers .pptx. When several files match, Jarvis reads out the top 3 and asks which one.
+
+**Routines** live in `data/routines.json`, which is copied from [routines.example.json](routines.example.json) the first time. A routine is a list of ordinary Jarvis commands, plus optional `{"wait": seconds}` and `{"say": "..."}` steps. The built-in ones are work mode, break time, movie mode and the shutdown routine. Schedules ("every weekday at 9:30 start work mode") are saved in the same file and run while Jarvis is running. A scheduled run never says yes for you, so a step that needs a confirmation (closing apps, shutting down) is skipped, and Jarvis tells you so.
+
+**Safety rules** (these apply to everything above):
+- Jarvis **always asks first** before it deletes, moves or renames a file, zips or creates something, closes an app that might have unsaved work, shuts down or restarts, empties the Recycle Bin, clears temp files, or types more than 200 characters (`TYPE_CONFIRM_CHARS`). A "no" does nothing.
+- **Delete only uses the Recycle Bin** (`send2trash`). Nothing is ever deleted permanently, and "undo that" restores it.
+- **System folders are off limits:** Windows, Program Files, ProgramData, AppData, drive roots, your user folder itself, and Jarvis's own folder. They're never indexed, and file actions there are refused.
+- The **registry** is only written for the two theme values (`AppsUseLightTheme`, `SystemUsesLightTheme`).
+- **No typing into terminals** unless you say "type in terminal ...". Enter and paste are refused there too. Jarvis asks before typing into a **password box**, and never logs what it typed there. **Banking and payment sites** get no typing, pasting or key presses at all. Clipboard text that looks like a password, OTP or API key is never read out.
+- "Close X" closes windows the way the X button does, so the app can still ask you to save. It never force-kills.
+- Turning Wi-Fi off asks first when speech recognition is online (`STT_ENGINE=google`), because Jarvis couldn't hear you afterwards. Muting the mic asks first for the same reason.
+- **Every action is logged** to `data/logs/actions.log`. "What did you just do" reads the last few back, and "undo that" reverts the last action that can be undone (moves, renames, deletes, new folders, zips, dark mode, volume, window changes, Wi-Fi and Bluetooth, deleted routines). It asks first.
+
+Needs `pywin32`, `pywinauto`, `pycaw`, `send2trash` and the `winrt-Windows.Media.Control` / `winrt-Windows.Devices.Radios` packages (all in `requirements.txt`; the WinRT ones support Python 3.13). Windows doesn't let apps flip Night light or airplane mode, so Jarvis opens those settings pages instead. Do Not Disturb is switched through the Settings page with UI Automation, and if that fails, the page is left open for you.
 
 ## Architecture
 
@@ -326,9 +359,22 @@ jarvis/translit.py      Hindi (Devanagari) -> English command rewriting
 jarvis/http.py          shared requests.Session with timeouts: get_json / get_text / post_json
 jarvis/geo.py           area name / pincode -> Place(name, lat, lon), location_from_command()
 jarvis/timeparse.py     spoken durations ("an hour and 30 minutes") and clock times ("at 6 pm")
+jarvis/desktop.py       low-level Windows calls: windows, focus, WM_CLOSE, Unicode typing, clipboard, password box
+jarvis/actions.py       action log (data/logs/actions.log), undo stack, protected-folder guard
+jarvis/hinglish.py      regex pieces for verb-last Hinglish ("wifi band kar de", "chrome pe switch kar")
 jarvis/skills/
-    __init__.py         imports skills IN ORDER: general, notes, gmail, calendar, spotify, browse, system,
-                        web, whatsapp, vscode, apps, weather, aqi, web_questions, knowledge, ai
+    __init__.py         the skill ORDER (earlier wins): general, notes, history, media_session, whatsapp, gmail,
+                        calendar, settings_control, spotify, browse, routines, keyboard_control, windows, files,
+                        system, web, vscode, app_index, apps, weather, aqi, web_questions, knowledge, ai, briefing
+    history.py          "what did you just do", "undo that"
+    media_session.py    what's playing in any app; play/pause/next/previous to the active media session
+    settings_control.py Wi-Fi, Bluetooth, dark mode, DND, battery saver, power mode, per-app volume, mic,
+                        audio output, Recycle Bin, temp files, ms-settings: pages
+    routines.py         routines and schedules (data/routines.json)
+    keyboard_control.py type, keys, shortcuts, scroll, clipboard
+    windows.py          switch, minimize/maximize/restore, snap, full screen, other screen, virtual desktops
+    files.py            file-name index, open/find, create folder, rename, move, zip, delete to Recycle Bin
+    app_index.py        installed-apps index (data/app_index.json), fuzzy match, is open / list / restart / close
     general.py          exit, sleep, help, greetings, time, date, calculator, jokes
     notes.py            notes file, reminders, timers
     gmail.py            unread count, read/search email, drafts only; "connect google"
@@ -346,8 +392,9 @@ jarvis/skills/
     aqi.py              CPCB AQI, pollutants, safety advice, red zones
     knowledge.py        Wikipedia summaries
     ai.py               OpenAI-compatible fallback with short conversation memory
-tests/                  offline tests: conftest.py blocks network, real apps, Google and Spotify;
-                        test_jarvis.py, test_whatsapp.py, test_vscode.py, test_gmail.py,
+tests/                  offline tests: conftest.py blocks network, real apps, Google, Spotify and every Windows
+                        API (windows, keys, clipboard, files, registry, radios, audio, media sessions);
+                        test_jarvis.py, test_laptop_control.py, test_whatsapp.py, test_vscode.py, test_gmail.py,
                         test_calendar.py, test_spotify.py (fakes.py holds the fake APIs)
 ```
 

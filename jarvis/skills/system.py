@@ -49,13 +49,29 @@ def windows_only(fn):
 
 
 # ---------------------------------------------------------------- volume and media
+def _volume_command(args):
+    """The AI's volume tool -> a command: up/down (by N), mute, set N, or one app's volume / mute."""
+    direction, amount, app = args.get("direction", "up"), args.get("amount"), args.get("app")
+    if app:
+        return f"mute {app}" if direction == "mute" else f"{app} volume {amount if amount is not None else 50}"
+    if direction == "mute":
+        return "mute"
+    if direction == "set":
+        return f"volume {amount if amount is not None else 50}"
+    return f"volume {direction}" + (f" by {amount}" if amount else "")
+
+
 def _steps(command, default=5):
     found = re.search(r"\bby\s+(\d{1,3})", command)
     return max(1, min(50, int(found.group(1)) // 2)) if found else default
 
 
 @skill("volume up", r"\bvolume up\b", r"\b(?:increase|raise|turn up)\s+(?:the\s+)?volume\b", r"\bturn (?:it|the volume) up\b",
-       r"\blouder\b", r"\bvolume (?:higher|increase)\b", category='laptop', help=['volume up', 'volume up by 20'], tool="volume", also=("volume down", "mute"), params={"direction": ["up", "down", "mute"], "amount?": ("integer", "percent to change by, e.g. 20")}, command=lambda a: "mute" if a.get("direction") == "mute" else f"volume {a.get('direction', 'up')}" + (f" by {a['amount']}" if a.get("amount") else ""))
+       r"\blouder\b", r"\bvolume (?:higher|increase)\b", category='laptop', help=['volume up', 'volume up by 20'], tool="volume",
+       also=("volume down", "mute", "set volume", "app volume"),
+       params={"direction": ["up", "down", "mute", "set"], "amount?": ("integer", "percent to change by, or the level for set"),
+               "app?": "only this app's volume, e.g. spotify, chrome"},
+       command=lambda a: _volume_command(a))
 @windows_only
 def volume_up(ctx, command, match):
     press("volumeup", _steps(command))
@@ -78,25 +94,45 @@ def mute(ctx, command, match):
     return ""
 
 
+def media(action, key):
+    """Send it to the playing app's media session (Spotify, YouTube in Chrome, VLC...), else press the media key."""
+    from jarvis.skills import media_session
+
+    if not media_session.control(action):
+        press(key)
+
+
 @skill("play pause", r"^(?:please\s+)?(?:pause|resume|unpause)(?:\s+(?:the\s+)?(?:music|song|video|media|playback|it))?$",
-       r"\bplay\s*pause\b", r"^(?:stop|pause) the (?:music|song|video)$", category='laptop', help=['pause the music', 'resume'], tool="media", also=("next track", "previous track"), params={"action": ["pause", "resume", "next", "previous"]}, command=lambda a: {"pause": "pause the music", "resume": "resume", "next": "next song", "previous": "previous song"}.get(a.get("action")))
+       r"^(?:please\s+)?play(?:\s+it)?$", r"\bplay\s*pause\b", r"^(?:stop|pause) the (?:music|song|video)$",
+       r"^(?:yaar\s+)?(?:gaana|gana|music|video)\s+(?:roko|rok do|band karo|band kar|band kar do|pause karo|pause kar)$",
+       r"^(?:yaar\s+)?(?:gaana|gana|music|video)\s+(?:chalao|chala do|play karo|resume karo)$",
+       category='laptop', help=['pause the music', 'resume'], tool="media", also=("next track", "previous track"), params={"action": ["pause", "resume", "next", "previous"]}, command=lambda a: {"pause": "pause the music", "resume": "resume", "next": "next song", "previous": "previous song"}.get(a.get("action")))
 @windows_only
 def play_pause(ctx, command, match):
-    press("playpause")
+    if re.search(r"\b(?:pause|stop|roko|rok|band)\b", command) and "play pause" not in command:
+        media("pause", "playpause")
+    elif re.search(r"\b(?:resume|unpause|play|chalao|chala)\b", command) and "play pause" not in command:
+        media("play", "playpause")
+    else:
+        media("toggle", "playpause")
     return ""
 
 
-@skill("next track", r"^(?:next|skip)$", r"\b(?:next|skip)(?:\s+(?:the|this))?\s+(?:song|track|video)\b", r"\bplay (?:the )?next\b", category='laptop', help=['next song'])
+@skill("next track", r"^(?:next|skip)$", r"\b(?:next|skip)(?:\s+(?:the|this))?\s+(?:song|track|video)\b", r"\bplay (?:the )?next\b",
+       r"^(?:yaar\s+)?(?:agla|next)\s+(?:gaana|gana|song)(?:\s+(?:chalao|lagao|laga do|chala do))?$",
+       category='laptop', help=['next song'])
 @windows_only
 def next_track(ctx, command, match):
-    press("nexttrack")
+    media("next", "nexttrack")
     return ""
 
 
-@skill("previous track", r"^previous$", r"\bprevious\s+(?:song|track|video)\b", r"\b(?:last|go back to the)\s+(?:song|track)\b", category='laptop', help=['previous song'])
+@skill("previous track", r"^previous$", r"\bprevious\s+(?:song|track|video)\b", r"\b(?:last|go back to the)\s+(?:song|track)\b",
+       r"^(?:yaar\s+)?(?:pichla|previous)\s+(?:gaana|gana|song)(?:\s+(?:chalao|lagao|laga do|chala do))?$",
+       category='laptop', help=['previous song'])
 @windows_only
 def previous_track(ctx, command, match):
-    press("prevtrack")
+    media("previous", "prevtrack")
     return ""
 
 
@@ -206,7 +242,9 @@ def cancel_shutdown(ctx, command, match):
 @skill("power", rf"^(?:please\s+)?(?:shut\s?down|restart|reboot){DEVICE}(?:\s+(?:in|after)\s+.+)?$",
        r"\b(?:turn|power|switch)\s+off\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
        r"\bshut\s?down\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
-       r"\b(?:restart|reboot)\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b", category='laptop', help=['shut down the laptop', 'restart in 10 minutes'], params={"action": ["shutdown", "restart"], "delay?": "e.g. 10 minutes"}, command=lambda a: ("shut down" if a.get("action") == "shutdown" else "restart") + " the laptop" + (f" in {a['delay']}" if a.get("delay") else ""), risky=True, confirms=True)
+       r"\b(?:restart|reboot)\b(?:\s+(?:the|my))?\s+(?:laptop|pc|computer|system|machine)\b",
+       r"^(?:(?:yaar|zara|please|bhai)\s+)*(?:laptop|pc|computer|system)\s+(?:band|bandh|shut\s?down|restart|reboot)"
+       r"(?:\s+(?:kar|karo|kar do|kar de|kar dena|de|do))?(?:\s+(?:na|please|yaar))*$", category='laptop', help=['shut down the laptop', 'restart in 10 minutes'], params={"action": ["shutdown", "restart"], "delay?": "e.g. 10 minutes"}, command=lambda a: ("shut down" if a.get("action") == "shutdown" else "restart") + " the laptop" + (f" in {a['delay']}" if a.get("delay") else ""), risky=True, confirms=True)
 @windows_only
 def power(ctx, command, match):
     restart = bool(re.search(r"\b(?:restart|reboot)\b", command))

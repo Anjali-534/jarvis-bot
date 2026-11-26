@@ -141,7 +141,7 @@ def test_run_unknown_falls_through_to_apps(tree, monkeypatch):
     from jarvis.skills import apps
 
     opened = []
-    monkeypatch.setattr(apps, "open_target", lambda name: opened.append(name) or name)
+    monkeypatch.setattr(apps, "open_target", lambda name, ctx=None: opened.append(name) or name)
     ctx = make_ctx()
     assert handle(ctx, "run notepad") == "open"
     assert opened == ["notepad"]

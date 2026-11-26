@@ -83,6 +83,9 @@ def _float(name, default):
         return default
 
 
+FILE_INDEX_HOURS = _float("FILE_INDEX_HOURS", 6.0)    # how often the file-name index is rebuilt
+TYPE_CONFIRM_CHARS = _int("TYPE_CONFIRM_CHARS", 200)   # "type ..." longer than this asks first
+
 NOTES_FILE = _path("NOTES_FILE", "data/notes.txt")
 SCREENSHOT_DIR = _path("SCREENSHOT_DIR", "~/Pictures/Jarvis Screenshots")
 
@@ -97,6 +100,12 @@ PROJECT_ROOTS = [
     if p.strip()
 ]
 PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")
+
+# Laptop control: the installed-apps index, the file-name index, routines and the action log
+APP_INDEX_FILE = _path("APP_INDEX_FILE", "data/app_index.json")      # refreshed daily and on "refresh apps"
+FILE_INDEX_FILE = _path("FILE_INDEX_FILE", "data/file_index.json")   # names + modified dates only, never contents
+ROUTINES_FILE = _path("ROUTINES_FILE", "data/routines.json")         # created from routines.example.json
+ROUTINES_EXAMPLE = BASE_DIR / "routines.example.json"
 
 # Background mode
 HOTKEY = _str("HOTKEY", "ctrl+alt+j")          # wakes Jarvis instantly; empty to disable

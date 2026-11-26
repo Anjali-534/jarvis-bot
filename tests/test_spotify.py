@@ -48,7 +48,7 @@ def test_controls_fall_back_to_media_keys(launched):
     assert launched == [("key", "playpause"), ("key", "nexttrack"), ("key", "prevtrack"), ("key", "playpause")]
 
 
-@pytest.mark.parametrize("phrase", ["what's playing", "spotify volume 50"])
+@pytest.mark.parametrize("phrase", ["what's playing on spotify", "spotify volume 50"])
 def test_not_connected_message(launched, phrase):
     ctx = make_ctx()
     handle(ctx, phrase)

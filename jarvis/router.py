@@ -8,6 +8,7 @@ A skill is a function ``handler(ctx, command, match)`` registered with ``@skill`
 """
 import logging
 import re
+import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -32,6 +33,7 @@ class Skill:
     also: tuple = ()              # other skills this tool's commands may land on (e.g. volume down, mute)
     risky: bool = False           # always confirm before running when the AI picked it
     confirms: bool = False        # the skill already asks for confirmation itself
+    module: str = ""              # the module that registered it (jarvis.skills orders SKILLS by module)
 
 
 SKILLS: list[Skill] = []
@@ -54,10 +56,12 @@ def skill(name, *patterns, help=(), category=None, params=None, command=None, to
     risky: confirm before running when the AI chose it (confirms=True if the skill already asks).
     """
     examples = [help] if isinstance(help, str) and help else list(help)
+    module = sys._getframe(1).f_globals.get("__name__", "")
 
     def decorator(fn):
         SKILLS.append(Skill(name, [re.compile(p, re.IGNORECASE) for p in patterns], fn, examples, category,
-                            params, command or (name if params == {} else None), tool, tuple(also), risky, confirms))
+                            params, command or (name if params == {} else None), tool, tuple(also), risky, confirms,
+                            module))
         return fn
 
     return decorator
@@ -260,9 +264,11 @@ def handle(ctx, command):
     """Route one command. Returns the name of the skill that handled it."""
     from jarvis import translit
 
-    command = re.sub(r"\s+", " ", (command or "").replace("﻿", "").strip().lower())
+    original = re.sub(r"\s+", " ", (command or "").replace("﻿", "").strip())
+    command = original.lower()
     if not command:
         return None
+    ctx.state["original"] = original  # with capitals, for "type ..." (skills get the lower-case command)
     ctx.state["heard"] = command  # what was actually said (skills reached via the AI get an English command)
     if translit.has_devanagari(command):
         # Hindi mode: try the English rewrite first; chat that isn't a command reaches the AI unchanged
@@ -305,6 +311,8 @@ MAX_TURNS_REMEMBERED = 3
 
 def remember_turn(ctx, command, skill_name):
     """Keep the last 3 turns so the AI can resolve follow-ups ("what about Noida?", "and tomorrow?")."""
+    if ctx.state.get("last_said"):
+        ctx.state["last_answer"] = ctx.state["last_said"]  # "copy that" copies it in full
     turns = ctx.state.setdefault("turns", [])
     turns.append({"you": command, "understood": ctx.state.get("understood") or command, "skill": skill_name,
                   "jarvis": (ctx.state.get("last_said") or "")[:200]})

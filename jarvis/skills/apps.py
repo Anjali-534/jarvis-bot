@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import time
 
+from jarvis import hinglish as hi
 from jarvis.router import skill
 from jarvis.skills import system, web
 
@@ -81,64 +82,139 @@ def start_menu(name):
     pyautogui.press("enter")
 
 
-def open_target(name):
-    """Open one app/site and return a short phrase describing what happened."""
+BROWSERS = {"chrome": "chrome", "google chrome": "chrome", "edge": "msedge", "microsoft edge": "msedge",
+            "firefox": "firefox", "brave": "brave"}
+_IN_BROWSER = re.compile(r"^(.+?)\s+(?:in|on|with|using)\s+(chrome|google chrome|edge|microsoft edge|firefox|brave)$")
+
+
+def is_known_target(text):
+    """Is every part of 'chrome and notepad' / 'github.com' / 'gmail in chrome' an app or site we know?"""
+    from jarvis.skills import app_index
+
+    parts = split_targets(text)
+    if not parts:
+        return False
+    for part in parts:
+        key = app_index.spoken_query(part)
+        browser = _IN_BROWSER.match(key)
+        domain = re.sub(r"\s*\bdot\b\s*", ".", key).replace(" ", "")
+        if not (key in APPS or key in WEBSITES or (browser and browser.group(1) in WEBSITES) or _DOMAIN.match(domain)
+                or app_index.candidates(key)[0] is not None):
+            return False
+    return True
+
+
+def open_in_browser(url, browser):
+    launch(f'{BROWSERS[browser]} "{url}"')
+
+
+def open_target(name, ctx=None):
+    """Open one app/site and return a short phrase describing what happened ("" = the user picked nothing).
+
+    Order: the APPS map, websites, domains, every installed app (fuzzy, asks when 2-3 are equally close),
+    programs on PATH, and only then typing the name into the Start menu."""
+    from jarvis import actions
+    from jarvis.skills import app_index
+
     key = re.sub(r"^(?:the|my)\s+", "", name.lower().strip(" ."))
+    if app_index.ALIASES.get(key.replace("'", "")) in APPS:  # "what's app" -> whatsapp
+        key = app_index.ALIASES[key.replace("'", "")]
     key = re.sub(r"\s+(?:app|application|website|site)$", "", key)
+    key = app_index.ALIASES.get(key, key) if app_index.ALIASES.get(key, key) in APPS else key
+    browser = _IN_BROWSER.match(key)
+    if browser and browser.group(1) in WEBSITES:  # "gmail in chrome"
+        open_in_browser(WEBSITES[browser.group(1)], browser.group(2))
+        actions.record(f"Opened {browser.group(1)} in {browser.group(2)}")
+        return f"{browser.group(1)} in {browser.group(2)}"
     if key in APPS:
         launch(APPS[key])
+        actions.record(f"Opened {key}")
         return key
     if key in WEBSITES:
         web.open_url(WEBSITES[key])
+        actions.record(f"Opened {WEBSITES[key]}")
         return key
     domain = re.sub(r"\s*\bdot\b\s*", ".", key).replace(" ", "")
     if _DOMAIN.match(domain):
         web.open_url(domain if domain.startswith("http") else f"https://{domain}")
+        actions.record(f"Opened {domain}")
         return domain
+    if system.IS_WINDOWS:
+        opened = app_index.open_app(ctx, key)
+        if opened is not None:
+            return opened
     exe = shutil.which(key) or shutil.which(key.replace(" ", ""))
     if exe:
         launch(f'"{exe}"')
+        actions.record(f"Opened {exe}")
         return key
     if not system.IS_WINDOWS:
         raise RuntimeError(f"Unknown app {key}")
-    start_menu(key)
+    start_menu(key)  # last resort: type it into Start
+    actions.record(f"Searched the Start menu for {key}")
     return f"{key} from the Start menu"
 
 
-@skill("open", r"^(?:please\s+)?(?:open|launch|start|run)\s+(?:up\s+)?(.+)$", category='apps', help=['open Chrome', 'open VS Code and Notepad', 'open GitHub'], params={"target": "app or website, e.g. chrome, notepad, github"}, command="open {target}")
+@skill("open", r"^(?:please\s+)?(?:open|launch|start|run)\s+(?:up\s+)?(.+)$",
+       rf"{hi.LEAD}{hi.MY}(.+?){hi.OPEN}$",
+       category='apps', help=['open Chrome', 'open VS Code and Notepad', 'open GitHub', 'open Gmail in Chrome'],
+       params={"target": "app or website, e.g. chrome, notepad, github"}, command="open {target}")
 def open_skill(ctx, command, match):
-    opened = [open_target(name) for name in split_targets(match.group(1))]
+    opened = [o for o in (open_target(name, ctx) for name in split_targets(match.group(1))) if o]
     if not opened:
-        return None
+        return "Okay, I didn't open anything." if split_targets(match.group(1)) else None
     return "Opening " + (opened[0] if len(opened) == 1 else ", ".join(opened[:-1]) + " and " + opened[-1]) + "."
 
 
 def kill(image):
-    return system.run(["taskkill", "/IM", image, "/F"])
+    """Ask a windowless process to exit (taskkill without /F: no forced kill)."""
+    return system.run(["taskkill", "/IM", image])
 
 
-@skill("close", r"^(?:please\s+)?(?:close|quit|exit|kill|terminate)\s+(?:the\s+|my\s+)?(.+)$", category='apps', help=['close Chrome', 'close this tab'], params={"target": "app to close, e.g. chrome"}, command="close {target}", risky=True)
+@skill("close", r"^(?:please\s+)?(?:close|quit|exit|kill|terminate)\s+(?:the\s+|my\s+)?(.+)$",
+       rf"{hi.LEAD}(.+?){hi.CLOSE}$",
+       category='apps', help=['close Chrome', 'close this tab'], params={"target": "app to close, e.g. chrome"},
+       command="close {target}", risky=True)
 def close_skill(ctx, command, match):
+    from jarvis.skills import app_index
+
     target = match.group(1).strip(" .")
     if re.fullmatch(r"(?:jarvis|yourself|you)", target):
         return None
-    if re.fullmatch(r"(?:this\s+|current\s+|the\s+)?window", target):
-        system.hotkey("alt", "f4")
-        return ""
+    if re.search(r"\b(?:wi-?\s?fi|bluetooth|dnd|do not disturb|dark mode|light mode|night light|mic|microphone|"
+                 r"music|gaana|gana|song|video|sound|awaaz|awaz|volume|notifications?|airplane mode|battery saver|laptop|pc|computer|system|machine|light|lights|fan|tv|door)\b",
+                 target):
+        return None  # "wifi band kar de" is a setting, "gaana band kar" is pause: not apps
     if re.fullmatch(r"(?:this\s+|current\s+|the\s+)?tab", target):
         system.hotkey("ctrl", "w")
         return ""
+    if re.fullmatch(r"(?:this\s+|current\s+|the\s+)?window", target):
+        from jarvis.skills import windows
+
+        return windows.close_active(ctx)
     if not system.IS_WINDOWS:
         return system.NOT_WINDOWS
-    closed, missing = [], []
+    closed, missing, kept = [], [], []
     for name in split_targets(target):
         key = re.sub(r"\s+(?:app|application)$", "", name.lower())
-        image = PROCESSES.get(key) or (key.replace(" ", "") + ".exe")
-        result = kill(image)
-        (closed if result.returncode == 0 else missing).append(key)
-    parts = []
+        result = app_index.close_app(ctx, key)
+        if result is None:  # no window: maybe it only lives in the tray
+            image = PROCESSES.get(key) or (key.replace(" ", "") + ".exe")
+            if app_index.running_process(key) and kill(image).returncode == 0:
+                from jarvis import actions
+
+                actions.record(f"Closed {key} (asked {image} to exit)")
+                closed.append(key)
+            else:
+                missing.append(key)
+        elif result.startswith("Okay"):
+            kept.append(result)
+        else:
+            closed.append(result)
+    parts = kept[:]
     if closed:
         parts.append("Closed " + " and ".join(closed) + ".")
     if missing:
         parts.append(" and ".join(missing) + (" doesn't" if len(missing) == 1 else " don't") + " seem to be running.")
-    return " ".join(parts).capitalize() if not closed else " ".join(parts)
+    text = " ".join(parts)
+    return text[:1].upper() + text[1:] if text else ""

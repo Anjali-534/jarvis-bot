@@ -34,6 +34,8 @@ def add_note(text):
 
 @skill("clear notes", r"\b(?:clear|delete|erase|remove|wipe)\b.*\bnotes?\b", category='notes', help=['clear my notes'])
 def clear_notes(ctx, command, match):
+    if re.search(r"\bnotes?\.\w{1,5}\b|\bnotes?\s+(?:dot\s+\w+|file|folder|document)\b", command):
+        return None  # "delete notes.txt" is a file (the files skill)
     notes = read_notes()
     if not notes:
         return "You don't have any notes to clear."

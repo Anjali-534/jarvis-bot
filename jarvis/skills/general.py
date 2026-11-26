@@ -53,7 +53,19 @@ CATEGORIES = {
                                               "temperature"}),
     "apps": ("apps", {"apps", "app", "applications", "application", "websites", "website", "open apps"}),
     "laptop": ("laptop controls", {"laptop", "laptop controls", "controls", "computer", "pc", "system", "volume",
-                                   "brightness", "battery", "media", "music", "screenshot", "shutdown", "shut down"}),
+                                   "brightness", "battery", "media", "music", "screenshot", "shutdown", "shut down",
+                                   "undo", "history", "what's playing", "now playing"}),
+    "windows": ("windows", {"windows", "window", "switch", "switching", "minimize", "maximize", "snap", "desktops",
+                            "virtual desktops", "full screen", "screen", "screens", "monitor"}),
+    "keyboard": ("typing and keyboard", {"typing and keyboard", "typing", "type", "keyboard", "keys", "shortcuts",
+                                         "clipboard", "copy", "paste", "tabs", "scroll"}),
+    "files": ("files", {"files", "file", "folders", "folder", "documents", "downloads", "resume", "find files",
+                        "delete", "rename", "zip"}),
+    "settings": ("settings", {"settings", "wifi", "wi-fi", "bluetooth", "dark mode", "theme", "do not disturb", "dnd",
+                              "focus", "battery saver", "power mode", "sound", "audio", "mic", "microphone",
+                              "headphones", "recycle bin", "temp files"}),
+    "routines": ("routines", {"routines", "routine", "work mode", "movie mode", "break time", "modes", "schedules",
+                              "automation"}),
     "web": ("web", {"web", "internet", "youtube", "google", "news", "search", "browser", "browse", "online"}),
     "notes": ("notes and reminders", {"notes and reminders", "notes", "note", "reminders", "reminder", "timers",
                                       "timer", "alarms"}),
@@ -72,8 +84,9 @@ CATEGORIES = {
 }
 
 SHORT_HELP = (
-    "I can help with air quality, time and weather, apps, laptop controls, web, notes and reminders, "
-    "WhatsApp, email, calendar, Spotify, VS Code, your daily briefing, and general questions. Say 'help with' and a category to hear its commands."
+    "I can help with air quality, time and weather, apps, windows, typing, files, settings, routines, laptop "
+    "controls, web, notes and reminders, WhatsApp, email, calendar, Spotify, VS Code, your daily briefing, and "
+    "general questions. Say 'help with' and a category to hear its commands."
 )
 
 

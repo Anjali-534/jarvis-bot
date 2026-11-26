@@ -248,7 +248,9 @@ def test_only_the_last_three_turns_are_sent(ai_router):
 
 # ---------------------------------------------------------------- safety
 RISKY = {"power", "whatsapp_message", "email_draft", "calendar_add", "calendar_cancel", "close",
-         "git_pull", "run_project"}
+         "git_pull", "run_project",
+         # laptop control: files change, typing, restarting an app
+         "rename_file", "move_file", "delete_file", "type_text", "restart_app"}
 
 
 def test_risky_tools_are_marked():

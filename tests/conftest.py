@@ -13,7 +13,8 @@ import jarvis.skills  # noqa: E402,F401
 from jarvis import geo, google_auth, http, router  # noqa: E402
 from jarvis.skills import calendar, spotify, vscode, whatsapp  # noqa: E402
 
-PURE_SKILLS = {"calculator"}  # real handlers that may return None to fall through
+# real handlers that may return None to fall through ("start chrome" isn't a routine, "open chrome" isn't a file)
+PURE_SKILLS = {"calculator", "run routine", "open file", "find file"}
 
 
 @pytest.fixture
@@ -24,6 +25,41 @@ def recorded_skills(monkeypatch):
             monkeypatch.setattr(sk, "handler", lambda ctx, cmd, m, name=sk.name: f"<{name}>")
     monkeypatch.setattr(router.FALLBACK, "handler", lambda ctx, cmd, m: "<ai>")
     monkeypatch.setattr(router.FALLBACK, "name", "ai")
+
+
+def _no_real_laptop_control(monkeypatch, tmp_path, forbidden):
+    """Windows, keys, clipboard, files, settings and media: all faked. Tests opt in with the `win` fixture."""
+    from jarvis import actions, desktop
+    from jarvis.skills import app_index, files, keyboard_control, media_session, routines, settings_control
+
+    for name in ("list_windows", "active_window", "focus", "show", "close", "is_alive", "type_text", "get_clipboard",
+                 "set_clipboard", "start", "start_app_id", "monitor_count"):
+        monkeypatch.setattr(desktop, name, forbidden)
+    monkeypatch.setattr(desktop, "focused_is_password", lambda: False)
+    monkeypatch.setattr(config, "APP_INDEX_FILE", tmp_path / "data" / "app_index.json")
+    monkeypatch.setattr(config, "FILE_INDEX_FILE", tmp_path / "data" / "file_index.json")
+    monkeypatch.setattr(config, "ROUTINES_FILE", tmp_path / "data" / "routines.json")
+    monkeypatch.setattr(config, "TYPE_CONFIRM_CHARS", 200)
+    monkeypatch.setattr(app_index, "scan_shortcuts", lambda: [])
+    monkeypatch.setattr(app_index, "scan_store_apps", lambda: [])
+    monkeypatch.setattr(app_index, "sleep", lambda s: None)
+    app_index.reset_cache()
+    monkeypatch.setattr(files, "known_folders", lambda: {})
+    monkeypatch.setattr(files, "index_roots", lambda: [])
+    for name in ("open_path", "trash", "restore_from_bin"):
+        monkeypatch.setattr(files, name, forbidden)
+    files.reset_index()
+    monkeypatch.setattr(keyboard_control, "scroll_by", forbidden)
+    monkeypatch.setattr(media_session, "sessions", lambda: [])  # no media session: the media keys are used
+    for name in ("radio_states", "set_radio", "get_theme", "set_theme", "set_dnd", "empty_bin", "clear_temp",
+                 "get_master", "set_master", "set_mic_mute", "output_devices", "set_output",
+                 "open_settings_page", "battery_saver_threshold", "set_battery_saver_threshold", "saved_networks",
+                 "connect_wifi", "wifi_details"):
+        monkeypatch.setattr(settings_control, name, forbidden)
+    monkeypatch.setattr(settings_control, "audio_sessions", lambda: [])  # no app is playing sound
+    monkeypatch.setattr(routines, "sleep", lambda s: None)
+    routines._ran.clear()
+    actions.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -106,6 +142,7 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CALENDAR_REMINDER_MINUTES", 10)
     monkeypatch.setattr(vscode, "_cache", None)
     geo._CACHE.clear()
+    _no_real_laptop_control(monkeypatch, tmp_path, forbidden)
     yield
     from jarvis.skills import notes
 

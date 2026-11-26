@@ -487,7 +487,8 @@ def resolve(ctx, command):
 
 # Alternatives the AI may offer for "can't do": only harmless skills (open a site or app, search, play music).
 SAFE_ALTERNATIVES = {"open", "web search", "web question", "google in browser", "youtube search", "play youtube",
-                     "spotify play", "news", "search more"}
+                     "spotify play", "news", "search more",
+                     "open file", "open folder", "open settings page", "now playing"}  # opening only; programs still ask
 
 
 def safe_alternative(command):

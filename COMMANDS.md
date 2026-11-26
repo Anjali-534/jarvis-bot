@@ -58,13 +58,18 @@ Live Indian CPCB AQI for any area or pincode. Jarvis remembers your area for the
 
 ## Apps
 - "Open Chrome" / "open VS Code and Notepad" / "open WhatsApp" / "open wifi settings"
-- "Open GitHub" / "open Gmail" / "open github.com" / "open example dot com"
-- "Open Figma" (anything unknown is searched in the Start menu)
-- "Close Chrome" / "quit Spotify" / "close this window" / "close this tab"
+- "Open GitHub" / "open Gmail" / "open github.com" / "open example dot com" / "open Gmail in Chrome"
+- "Open Figma" / "open snipping tool": any installed app, Store apps included. Speech slips are fine: "what's app", "spotfy", "calculater". If two or three apps are equally close ("open visual studio"), Jarvis asks which one. Typing into the Start menu is only the last resort.
+- "Close Chrome" / "quit Spotify" / "close this window" / "close this tab": closes like the X button. Apps that might have unsaved work (Notepad, Word, VS Code...) ask first.
+- "Is Chrome open?" / "list open apps" / "what apps are open"
+- "Restart Spotify" / "close all apps" (asks first; terminals are left alone)
+- "Refresh apps" (rebuilds the installed-apps list; it also refreshes itself daily)
 
 ## Laptop controls
-- "Volume up" / "volume up by 20" / "turn down the volume" / "mute"
-- "Pause the music" / "resume" / "next song" / "previous song"
+- "Volume up" / "volume up by 20" / "turn down the volume" / "mute" / "volume 30"
+- "Pause the music" / "resume" / "play" / "next song" / "previous song" (these go to whatever is playing: Spotify, YouTube in Chrome, VLC...; otherwise the media keys)
+- "What's playing" / "what song is this" (any app)
+- "What did you just do" / "undo that" (asks first)
 - "Brightness 70" / "brightness up" / "dim the screen"
 - "Take a screenshot" (saved to Pictures\Jarvis Screenshots)
 - "Battery status" / "system status" / "CPU usage"
@@ -73,6 +78,66 @@ Live Indian CPCB AQI for any area or pincode. Jarvis remembers your area for the
 - "Cancel shutdown"
 - "Put the laptop to sleep" (asks first)
 - "Start with Windows" / "don't start with Windows" (asks first)
+
+## Windows
+- "Switch to Chrome" / "go to Notepad" / "chrome pe switch kar" (if it isn't open, Jarvis offers to open it)
+- "Minimize Chrome" / "maximize this window" / "restore Notepad"
+- "Minimize everything" / "show desktop"
+- "Snap Chrome left" / "snap this window right"
+- "Close this window" (asks first if there might be unsaved work)
+- "Full screen" / "exit full screen"
+- "Move this to the other screen"
+- "New desktop" / "next desktop" / "previous desktop" / "close this desktop"
+- "What's on my screen right now" (the app in front and its window title)
+
+## Typing and keyboard
+- "Type hello comma see you at 5 full stop": types into the window in front, keeping your capitals. Says "comma", "full stop", "question mark" and "new line" as punctuation.
+- "Type in terminal git status": the only way to type into a terminal. Jarvis never presses Enter for you there.
+- Asks first before typing into a password box, or typing more than 200 characters. Never types on banking or payment sites.
+- "Press enter" / "press escape" / "press tab 3 times" / "press F5"
+- "Select all" / "copy" / "cut" / "paste" / "undo" / "redo" / "save"
+- "New tab" / "close tab" / "reopen tab" / "next tab" / "go back" / "go forward" / "refresh"
+- "Zoom in" / "zoom out" / "reset zoom" / "find on this page"
+- "Scroll down" / "scroll up a lot" / "go to the top"
+- "Read my clipboard" (text only, 2 sentences; passwords, OTPs and keys are never read out)
+- "Copy that" (copies Jarvis's last answer)
+
+## Files
+Jarvis knows the **names** of your files in Desktop, Documents, Downloads, Pictures, Videos, Music, OneDrive and your project folders (never their contents), refreshed every 6 hours.
+- "Open my resume" / "meri resume khol" / "open the bogie pitch deck": when several files match, Jarvis reads out the top 3 and asks which one
+- "Find the bogie pitch deck" / "where is my resume" / "meri resume kahan hai"
+- "Open the latest download" (programs and installers ask before running)
+- "Show files I downloaded today" / "yesterday" / "this week"
+- "Open my Downloads folder" / "open documents"
+- "Create folder Receipts on desktop" / "rename notes.txt to ideas.txt" / "move resume to Documents" / "zip the jarvis folder" (each asks first)
+- "Delete old notes.txt": Recycle Bin only, asks first, never a permanent delete
+- "Undo that": puts it back (moves, renames, deletes, new folders, zips)
+- "Refresh files" (rescans now)
+- Windows, Program Files, ProgramData, AppData and other system folders are never touched.
+
+## Settings
+- "Turn off wifi" / "wifi on" / "wifi status" / "yaar wifi band kar de" (asks first if you're talking to Jarvis, since speech recognition needs the internet)
+- "Connect to Home WiFi" (saved networks only)
+- "Turn on Bluetooth" / "Bluetooth off" / "is Bluetooth on?" / "is airplane mode on?"
+- "Dark mode on" / "switch to light mode" / "dark mode laga do"
+- "Night light" (opens its settings; Windows doesn't let apps flip it)
+- "Do not disturb on" / "DND off" / "focus mode off"
+- "Battery saver on" / "battery saver off" / "best performance mode" / "balanced power mode"
+- "Volume 30" / "Spotify volume 30" / "Chrome volume 50" / "mute Chrome" / "unmute Chrome"
+- "Mute my mic" / "unmute mic" (asks first: Jarvis can't hear you while it's muted)
+- "Switch to headphones" / "switch to speakers" / "switch audio to AirPods"
+- "Empty the recycle bin" / "clear temp files" (both ask first; temp is your own temp folder only)
+- "Open display settings" / "sound" / "wifi" / "bluetooth" / "battery" / "apps" / "updates" / "privacy" / "storage" / "notifications" / "taskbar"... settings
+
+## Routines
+One phrase runs several commands. They're in `data/routines.json` (copied from `routines.example.json` the first time), so you can edit them by hand too.
+- "Start work mode": VS Code with bogie, Gmail and GitHub in Chrome, your Spotify focus playlist, Do not disturb on, volume 30
+- "Break time": pauses the music, Do not disturb off, reminds you in 15 minutes to get back to work
+- "Movie mode": dark mode, brightness 40, volume 70, Netflix
+- "Shutdown routine": a reminder to save your work, closes your apps (asks first), shuts down in 5 minutes (asks first)
+- "Create a routine called study time": Jarvis asks for each step ("open notion", "do not disturb on", "wait 5 seconds"...). Say "done" to finish.
+- "List my routines" / "delete routine study time" (asks first)
+- "Every weekday at 9:30 start work mode" / "every day at 7 pm start movie mode" / "on weekends at 10 am start break time" / "cancel the work mode schedule". These run while Jarvis is running. A scheduled run never says yes for you, so a step that needs your yes is skipped and you're told.
 
 ## Web
 - "Play Arijit Singh songs" / "play lofi beats on YouTube"
@@ -182,8 +247,14 @@ You don't need the exact phrases above. If no command matches, the AI works out 
 | "make it 5 minutes instead" (after a timer) | a new 5-minute timer |
 | "who won the match yesterday" / "petrol price in delhi today" | searches the web and answers |
 | "tell me a fun fact" | just answers |
+| "yaar wifi band kar de" / "bluetooth chalu karo" | Wi-Fi off / Bluetooth on (no AI needed) |
+| "chrome pe switch kar" / "meri resume khol" / "notepad khol do" | switch to Chrome / open your resume / open Notepad (no AI needed) |
+| "laptop band kar do" | shut down (asks first) |
+| "chrome window pe le chal" | switch to Chrome |
 
-Anything that sends, deletes, shuts down or closes apps always asks first. Needs `AI_API_KEY`.
+Anything that sends, deletes, moves, renames, shuts down or closes apps always asks first. Needs `AI_API_KEY` (the "no AI needed" rows work without it).
+
+Every laptop action is logged in `data/logs/actions.log`: "what did you just do" reads it back.
 
 ## Hindi commands (after "switch to Hindi")
 In Hindi mode you can give commands in natural Hindi. Jarvis rewrites them into English and prints what it understood, for example `(understood as: open chrome)`. Messages, notes and reminder texts are kept exactly as you said them. Anything that isn't a command goes to the AI unchanged, so you can chat in Hindi too.

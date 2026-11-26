@@ -1,0 +1,43 @@
+{
+  "_help": "Copied to data/routines.json the first time Jarvis runs. A step is any Jarvis command, {\"wait\": seconds} or {\"say\": \"text\"}. Schedules: {\"routine\": \"work mode\", \"days\": [\"mon\", \"tue\", \"wed\", \"thu\", \"fri\"], \"time\": \"09:30\"}, or say \"every weekday at 9:30 start work mode\".",
+  "routines": {
+    "work mode": {
+      "aliases": ["work", "office mode", "kaam"],
+      "steps": [
+        "open bogie in vs code",
+        "open gmail in chrome",
+        "open github in chrome",
+        "play my focus playlist on spotify",
+        "do not disturb on",
+        "volume 30"
+      ]
+    },
+    "break time": {
+      "aliases": ["break", "break mode"],
+      "steps": [
+        "pause the music",
+        "do not disturb off",
+        "remind me in 15 minutes to get back to work"
+      ]
+    },
+    "movie mode": {
+      "aliases": ["movie time", "netflix mode"],
+      "steps": [
+        "dark mode on",
+        "brightness 40",
+        "volume 70",
+        "open netflix"
+      ]
+    },
+    "shutdown routine": {
+      "aliases": ["shut down routine", "end of day", "wind down"],
+      "steps": [
+        {"say": "Save your work now. I'll close your apps in ten seconds."},
+        {"wait": 10},
+        "close all apps",
+        "shut down the laptop in 5 minutes"
+      ]
+    }
+  },
+  "schedules": []
+}
