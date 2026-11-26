@@ -646,7 +646,8 @@ def recorder(monkeypatch):
     """Every skill except the routine ones just records the command it got."""
     ran = []
     keep = {"run routine", "create routine", "list routines", "delete routine", "schedule routine", "cancel schedule",
-            "undo that", "what did you do", "open file", "find file"}  # these two fall through when it's not a file
+            "undo that", "what did you do", "open file", "find file",  # these fall through when it's not a file
+            "forget memory", "recall memory"}  # ...or not a memory
     for sk in router.SKILLS:
         if sk.name not in keep:
             monkeypatch.setattr(sk, "handler", lambda ctx, cmd, m, name=sk.name: ran.append((name, cmd)) or "")

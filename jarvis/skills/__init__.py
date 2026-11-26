@@ -8,6 +8,9 @@ web_questions (the regex fast path to a web answer: "petrol price today") comes 
 web (news) and before knowledge, so "weather today" stays weather but "who is the current PM" is
 searched.
 
+memory ("remember that...", "Dhruv ka birthday kab hai?") comes right after general, before notes ("take a
+note" stays a note).
+
 Laptop control:
 * history ("undo that") comes before keyboard_control ("undo" = Ctrl+Z).
 * media_session ("what's playing" in any app) comes before spotify, which keeps "what's playing on spotify".
@@ -25,14 +28,14 @@ To add an integration, create jarvis/skills/<name>.py with @skill handlers and a
 """
 # whatsapp sits before gmail because gmail imports it (that's always been the effective order)
 ORDER = [
-    "general", "notes", "history", "media_session", "whatsapp", "gmail", "calendar", "settings_control", "spotify",
+    "general", "memory", "notes", "history", "media_session", "whatsapp", "gmail", "calendar", "settings_control", "spotify",
     "browse", "routines", "keyboard_control", "windows", "files", "system", "web", "vscode", "app_index", "apps",
     "weather", "aqi", "facts", "web_questions", "knowledge", "ai",
     "briefing",  # last: "good morning" falls through from the plain greeting
 ]
 
 from jarvis.skills import (  # noqa: E402,F401
-    general, notes, history, media_session, gmail, calendar, settings_control, spotify, browse, routines,
+    general, memory, notes, history, media_session, gmail, calendar, settings_control, spotify, browse, routines,
     keyboard_control, windows, files, system, web, whatsapp, vscode, app_index, apps, weather, aqi, facts,
     web_questions, knowledge, ai, briefing,
 )

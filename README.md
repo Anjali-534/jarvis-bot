@@ -269,8 +269,15 @@ Speed on this laptop (free ddgs, no Tavily key), first answer sentence: about 2 
 Limits: sites that draw their numbers with JavaScript (live scores, stock tickers) often give no readable text, and then Jarvis says it couldn't find a reliable answer. It can only be as current as the pages the search returns.
 - "News", "news about cricket", "tech news"
 
+**Memory** (`skills/memory.py`, kept in `data/memory.json`, which is git-ignored)
+- "Remember that Dhruv's birthday is 12 Feb", "remember I like cold coffee", "yaad rakhna ki meri bike ki service March mein hai". Each memory gets a category (personal, people, dates, preferences, work, other). A date in it sets a 9 am spoken reminder and a toast on that day. Birthdays and anniversaries remind you yearly, plus the day before.
+- "Dhruv ka birthday kab hai?", "what did I tell you about my bike?", "what do you know about me?" Recall uses keyword and fuzzy matching. With an AI key, the AI picks the best of the matches and answers like a friend, using only what you told it.
+- The AI chat gets the 5 most relevant memories with each question, plus same-topic ones (food, music, films...). It's told to use them only when they help ("Cold coffee bana le, tujhe toh pasand hai na").
+- "Forget that" / "bhool ja ki..." (reads it back, asks first), "update: Dhruv's birthday is 14 Feb", "list my memories", "export my memories" (a readable file in Documents). "Undo that" also works.
+- Passwords, OTPs, PINs, card and bank numbers, Aadhaar and PAN are refused. Health and sad memories are marked sensitive: Jarvis never mentions them unless you bring the topic up first.
+
 **Notes, reminders and timers**
-- "Take a note buy milk", "remember that the meeting is at 5"
+- "Take a note buy milk", "note down the meeting is at 5"
 - "Read my notes", "clear my notes" (asks first)
 - "Remind me in 10 minutes to drink water", "remind me at 6 pm to call mom", "remind me in an hour and 30 minutes to stretch"
 - "Set a timer for 5 minutes", "what are my reminders", "cancel my reminders"
@@ -367,6 +374,7 @@ jarvis/skills/
     __init__.py         the skill ORDER (earlier wins): general, notes, history, media_session, whatsapp, gmail,
                         calendar, settings_control, spotify, browse, routines, keyboard_control, windows, files,
                         system, web, vscode, app_index, apps, weather, aqi, web_questions, knowledge, ai, briefing
+    memory.py           long-term memory (data/memory.json): remember, recall, forget, update, export, date reminders
     history.py          "what did you just do", "undo that"
     media_session.py    what's playing in any app; play/pause/next/previous to the active media session
     settings_control.py Wi-Fi, Bluetooth, dark mode, DND, battery saver, power mode, per-app volume, mic,

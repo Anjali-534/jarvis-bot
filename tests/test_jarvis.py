@@ -36,7 +36,7 @@ ROUTES = [
     ("thank you", "thanks"), ("what time is it", "time"), ("what's the date today", "date"),
     ("what is 5 plus 3", "calculator"), ("tell me a joke", "joke"),
     # notes / reminders
-    ("take a note buy milk", "take note"), ("remember that the meeting is at 5", "take note"),
+    ("take a note buy milk", "take note"), ("remember that the meeting is at 5", "remember"),
     ("read my notes", "read notes"), ("clear my notes", "clear notes"),
     ("remind me in 10 minutes to drink water", "reminder"), ("set a timer for 5 minutes", "timer"),
     ("what are my reminders", "list reminders"), ("cancel my reminders", "cancel reminders"),
@@ -382,7 +382,7 @@ def test_notes(monkeypatch, tmp_path):
     assert ctx.voice.last == "Noted: buy milk."
     handle(ctx, "read my notes")
     assert ctx.voice.last == "You have 1 note: buy milk."
-    handle(ctx, "remember that the meeting is at 5")
+    handle(ctx, "note down the meeting is at 5")  # "remember that..." is long-term memory now
     handle(ctx, "read my notes")
     assert ctx.voice.last.startswith("You have 2 notes.") and "1: the meeting is at 5" in ctx.voice.last
     ctx.voice.answers = ["call the bank"]

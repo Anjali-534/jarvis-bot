@@ -64,6 +64,8 @@ CATEGORIES = {
     "settings": ("settings", {"settings", "wifi", "wi-fi", "bluetooth", "dark mode", "theme", "do not disturb", "dnd",
                               "focus", "battery saver", "power mode", "sound", "audio", "mic", "microphone",
                               "headphones", "recycle bin", "temp files"}),
+    "memory": ("memory", {"memory", "memories", "remember", "remembering", "yaad", "forget", "birthdays",
+                          "birthday", "what you know about me"}),
     "routines": ("routines", {"routines", "routine", "work mode", "movie mode", "break time", "modes", "schedules",
                               "automation"}),
     "web": ("web", {"web", "internet", "youtube", "google", "news", "search", "browser", "browse", "online"}),
@@ -84,7 +86,7 @@ CATEGORIES = {
 }
 
 SHORT_HELP = (
-    "I can help with air quality, time and weather, apps, windows, typing, files, settings, routines, laptop "
+    "I can help with air quality, time and weather, remembering things for you, apps, windows, typing, files, settings, routines, laptop "
     "controls, web, notes and reminders, WhatsApp, email, calendar, Spotify, VS Code, your daily briefing, and "
     "general questions. Say 'help with' and a category to hear its commands."
 )

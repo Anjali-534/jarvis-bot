@@ -14,7 +14,7 @@ from jarvis import geo, google_auth, http, router  # noqa: E402
 from jarvis.skills import calendar, spotify, vscode, whatsapp  # noqa: E402
 
 # real handlers that may return None to fall through ("start chrome" isn't a routine, "open chrome" isn't a file)
-PURE_SKILLS = {"calculator", "run routine", "open file", "find file"}
+PURE_SKILLS = {"calculator", "run routine", "open file", "find file", "recall memory", "forget memory"}
 
 
 @pytest.fixture
@@ -39,6 +39,8 @@ def _no_real_laptop_control(monkeypatch, tmp_path, forbidden):
     monkeypatch.setattr(config, "APP_INDEX_FILE", tmp_path / "data" / "app_index.json")
     monkeypatch.setattr(config, "FILE_INDEX_FILE", tmp_path / "data" / "file_index.json")
     monkeypatch.setattr(config, "ROUTINES_FILE", tmp_path / "data" / "routines.json")
+    monkeypatch.setattr(config, "MEMORY_FILE", tmp_path / "data" / "memory.json")
+    monkeypatch.setattr(config, "MEMORY_REMINDER_HOUR", 9)
     monkeypatch.setattr(config, "TYPE_CONFIRM_CHARS", 200)
     monkeypatch.setattr(app_index, "scan_shortcuts", lambda: [])
     monkeypatch.setattr(app_index, "scan_store_apps", lambda: [])

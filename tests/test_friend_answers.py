@@ -247,7 +247,8 @@ def test_no_hard_coded_gender_in_any_phrase():
 def render_all(**extra):
     values = dict(name="Anjali", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
                   action="restart", delay="15 seconds", duration="5 minutes", text="t", count="2 notes", time="2",
-                  alternative="Google pe dhoondh doon", place="Rohini", aqi="312", **persona._verb_forms(), **extra)
+                  alternative="Google pe dhoondh doon", place="Rohini", aqi="312", day="12 February", every="", memory="m", topic="bike", old="o", new="n", folder="Documents", 
+                  **persona._verb_forms(), **extra)
     return " ".join(t.format(**values) for t in all_templates())
 
 

@@ -55,7 +55,7 @@ def test_every_phrase_renders_for_both_voice_genders(monkeypatch, tts_voice, wan
     monkeypatch.setattr(config, "TTS_VOICE", tts_voice)
     values = dict(name="Anjali", assistant="Jarvis", part_of_day="morning", when="in 10 minutes", message="m",
                   action="restart", delay="15 seconds", duration="5 minutes", text="t", count="2 notes", time="2",
-                  alternative="Google pe dhoondh doon",
+                  alternative="Google pe dhoondh doon", day="12 February", every="", memory="m", topic="bike", old="o", new="n", folder="Documents", 
                   **persona._verb_forms())
     rendered = " ".join(t.format(**values) for entry in persona.PHRASES.values() for options in entry.values()
                         for t in options)

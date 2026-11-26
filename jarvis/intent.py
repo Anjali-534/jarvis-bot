@@ -123,7 +123,8 @@ SYNONYMS = {
     "gaana": "play song music", "gaane": "play song music", "song": "play music", "songs": "play music",
     "bajao": "play", "chalao": "play open", "sunao": "play", "music": "play", "playlist": "playlist spotify",
     "kholo": "open", "khol": "open", "launch": "open", "band": "close shut", "bandh": "close shut",
-    "yaad": "remind reminder", "dila": "remind", "dilana": "remind", "remind": "reminder", "alarm": "reminder timer",
+    "yaad": "remind reminder remember recall memory", "dila": "remind", "bola": "tell told recall",
+    "bataya": "tell told recall", "bhool": "forget", "bhul": "forget", "baare": "about recall", "dilana": "remind", "remind": "reminder", "alarm": "reminder timer",
     "baje": "at", "subah": "morning am", "shaam": "evening pm", "kal": "tomorrow",
     "mausam": "weather", "barish": "rain weather", "baarish": "rain weather", "garmi": "weather temperature",
     "thand": "weather temperature", "temperature": "weather", "hawa": "air quality aqi", "pradushan": "pollution aqi",
@@ -340,7 +341,10 @@ def system_text(ctx):
     recent = _context(ctx)
     me = (f"You are {config.ASSISTANT_NAME}, voice assistant on {config.USER_NAME}'s laptop in India. "
           f"Now: {datetime.now():%a %d %b %Y %I:%M %p}. ")
-    return (me + RULES + "\nStyle for reply: " + persona.ai_style(brief=True)
+    from jarvis.skills import memory
+
+    remembered = memory.context_for(ctx.state.get("heard") or "", count=3)  # only when they're relevant
+    return (me + RULES + "\nStyle for reply: " + persona.ai_style(brief=True) + remembered
             + (f"\n\nRecent conversation:\n{recent}" if recent else ""))
 
 

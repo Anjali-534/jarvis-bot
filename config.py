@@ -104,7 +104,9 @@ PROJECTS_FILE = _path("PROJECTS_FILE", "data/projects.json")
 # Laptop control: the installed-apps index, the file-name index, routines and the action log
 APP_INDEX_FILE = _path("APP_INDEX_FILE", "data/app_index.json")      # refreshed daily and on "refresh apps"
 FILE_INDEX_FILE = _path("FILE_INDEX_FILE", "data/file_index.json")   # names + modified dates only, never contents
-ROUTINES_FILE = _path("ROUTINES_FILE", "data/routines.json")         # created from routines.example.json
+ROUTINES_FILE = _path("ROUTINES_FILE", "data/routines.json")
+MEMORY_FILE = _path("MEMORY_FILE", "data/memory.json")               # long-term memory (git-ignored)
+MEMORY_REMINDER_HOUR = _int("MEMORY_REMINDER_HOUR", 9)               # dated memories are spoken at this hour         # created from routines.example.json
 ROUTINES_EXAMPLE = BASE_DIR / "routines.example.json"
 
 # Background mode

@@ -636,7 +636,9 @@ def ai(ctx, command, match=None):
         return persona.line("ai_down")  # the AI router just tried both for this command: don't make the user wait
     history = ctx.state.setdefault("ai_history", [])
     recent, summary = compact_history(history)
-    system = system_prompt() + (f" {summary}." if summary else "")
+    from jarvis.skills import memory
+
+    system = system_prompt() + memory.context_for(command) + (f" {summary}." if summary else "")
     from jarvis import timing
 
     timing.add_tokens("chat", _tokens(system) + sum(_tokens(m["content"]) for m in recent) + _tokens(command), True)

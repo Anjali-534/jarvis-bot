@@ -187,6 +187,65 @@ PHRASES = {
         PROFESSIONAL: ["Checking online."],
         FRIEND: ["Ruk, online dekh{ta} hoon", "Ek sec, internet pe check kar{ta} hoon", "Dekh{ta} hoon online"],
     },
+    # ---------------------------------------------------------------- long-term memory (skills/memory.py)
+    "memory_saved": {
+        PROFESSIONAL: ["Got it, I'll remember that."],
+        FRIEND: ["Done, yaad rahega!", "Pakka, yaad rakhun{ga}.", "Noted yaar, yaad rahega."],
+    },
+    "memory_will_remind": {
+        PROFESSIONAL: ["I'll remind you on {day}{every}."],
+        FRIEND: ["{day} ko yaad dila dun{ga}{every}.", "Aur {day} ko{every} yaad bhi dila dun{ga}."],
+    },
+    "memory_known": {
+        PROFESSIONAL: ["I already know that."],
+        FRIEND: ["Ye toh mujhe pehle se yaad hai!", "Haan haan, yaad hai mujhe."],
+    },
+    "memory_secret": {
+        PROFESSIONAL: ["I won't save that. Passwords, OTPs and card, bank or ID numbers belong in a password manager."],
+        FRIEND: ["Ye mat bata mujhe yaar, kahin safe jagah rakh. Password manager best hai.",
+                 "Arre ye sab mujhe mat bata, ye kisi safe jagah rakh. Main ye save nahi kar{ta}."],
+    },
+    "memory_recall": {
+        PROFESSIONAL: ["You told me: {memory}."],
+        FRIEND: ["Tune bataya tha: {memory}.", "Haan yaad hai: {memory}."],
+    },
+    "memory_none": {
+        PROFESSIONAL: ["You haven't told me anything about {topic} yet."],
+        FRIEND: ["Tune {topic} ke baare mein abhi tak kuch nahi bataya yaar.",
+                 "{topic} ke baare mein toh kuch yaad nahi, tune bataya hi nahi."],
+    },
+    "memory_empty": {
+        PROFESSIONAL: ["I don't have any memories yet. Say remember that, and something to remember."],
+        FRIEND: ["Abhi tak tune kuch yaad rakhne ko bola hi nahi! Bol 'remember that...'."],
+    },
+    "memory_confirm_forget": {
+        PROFESSIONAL: ["Forget this: {memory}?"],
+        FRIEND: ["Ye wali baat bhool jaun: {memory}?", "Pakka? Ye bhool jaun: {memory}?"],
+    },
+    "memory_kept": {
+        PROFESSIONAL: ["Okay, I'll keep it."],
+        FRIEND: ["Theek hai, yaad rakh{ta} hoon.", "Chal, nahi bhool{ta}."],
+    },
+    "memory_forgot": {
+        PROFESSIONAL: ["Done, I've forgotten it."],
+        FRIEND: ["Done, bhool gay{a}. Kya tha? Pata nahi!", "Ho gaya, mere dimaag se delete."],
+    },
+    "memory_updated": {
+        PROFESSIONAL: ["Updated. It was: {old}. Now: {new}."],
+        FRIEND: ["Update kar diya! Pehle tha: {old}. Ab: {new}.", "Theek hai, ab yaad rahega: {new}."],
+    },
+    "memory_exported": {
+        PROFESSIONAL: ["I've saved your memories to a file in {folder}, called Jarvis memories."],
+        FRIEND: ["Ho gaya, {folder} mein 'Jarvis memories' file bana di."],
+    },
+    "memory_today": {
+        PROFESSIONAL: ["A reminder for today: {memory}."],
+        FRIEND: ["Yaad dila dun{ga}, aaj ka hai: {memory}.", "Aaj yaad rakhna: {memory}."],
+    },
+    "memory_tomorrow": {
+        PROFESSIONAL: ["Tomorrow: {memory}."],
+        FRIEND: ["Kal ke liye yaad dila dun{ga}: {memory}.", "Heads up, kal hai: {memory}."],
+    },
     "not_sure": {  # a factual question the web couldn't confirm: never guess
         PROFESSIONAL: ["I'm not sure, and I couldn't confirm it online. Shall I open a Google search?"],
         FRIEND: ["Pakka nahi hoon yaar, online bhi confirm nahi mila. Google pe dekh lein?",

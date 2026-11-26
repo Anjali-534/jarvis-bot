@@ -59,7 +59,7 @@ def read_notes_skill(ctx, command, match):
 
 
 @skill("take note", r"\b(?:take|make|write|add|create)\s+(?:a\s+|down\s+a\s+|this\s+)?note(?:\s+(?:that|saying|of))?\s*:?\s*(.*)$",
-       r"\bnote (?:down|this|that)\s*:?\s*(.*)$", r"^remember (?:that\s+)?(.+)$", r"\bremember that\s+(.+)$", category='notes', help=['take a note buy milk', 'remember that the meeting is at 5'], params={"text": "what to note down"}, command="take a note {text}")
+       r"\bnote (?:down|this|that)\s*:?\s*(.*)$", category='notes', help=['take a note buy milk', 'note down the meeting is at 5'], params={"text": "what to note down"}, command="take a note {text}")
 def take_note(ctx, command, match):
     text = match.group(1).strip(" .:")
     if not text:

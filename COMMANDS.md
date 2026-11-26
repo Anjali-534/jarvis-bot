@@ -152,8 +152,20 @@ Jarvis says "Checking online", searches, and answers in 1 or 2 sentences from th
 - Then: "tell me more" (reads the pages for a longer answer), "which website said that" / "source?", "open the first source" / "open that in Chrome", "search more about its battery life"
 - "Open best laptops under 60000 in browser" / "show me in Chrome": opens Google results instead
 
+## Memory
+Jarvis remembers things for good, like a friend. Memories are kept in `data/memory.json`, which is never committed to git.
+- "Remember that Dhruv's birthday is 12 Feb" / "remember I like cold coffee" / "yaad rakhna ki meri bike ki service March mein hai" / "Dhruv ka birthday 12 Feb ko hai, yaad rakhna"
+- A date in a memory sets a reminder: Jarvis says it and shows a toast at 9 am on that day (`MEMORY_REMINDER_HOUR`). Birthdays and anniversaries remind you every year, and the day before too. "March mein" means 1 March.
+- "Dhruv ka birthday kab hai?" / "meri bike ki service kab hai?" / "what did I tell you about my bike?" / "tujhe yaad hai maine kya bola tha bike ke baare mein?" / "what do you know about me?"
+- In normal chat Jarvis uses what it remembers when it's relevant: "kuch thanda peene ka mann hai" gets "Cold coffee bana le, tujhe toh pasand hai na!"
+- "Forget that" / "bhool ja ki meri bike ki service March mein hai": Jarvis reads the memory back and asks first. A "no" keeps it.
+- "Update: Dhruv's birthday is 14 Feb" replaces the old one. Saying a changed fact again also offers to update it.
+- "List my memories": how many, plus the latest 5 (the full list is printed). "Export my memories" writes `Documents\Jarvis memories.txt`.
+- Never saved: passwords, OTPs, PINs, card and bank numbers, Aadhaar, PAN ("Ye mat bata mujhe yaar, kahin safe jagah rakh").
+- Health and sad personal memories are never brought up unless you bring the topic up first.
+
 ## Notes and reminders
-- "Take a note buy milk" / "remember that the meeting is at 5"
+- "Take a note buy milk" / "note down the meeting is at 5"
 - "Read my notes" / "clear my notes" (asks first)
 - "Remind me in 10 minutes to drink water" / "remind me at 6 pm to call mom" / "remind me in an hour and 30 minutes to stretch"
 - "Set a timer for 5 minutes"
