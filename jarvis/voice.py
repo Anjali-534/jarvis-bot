@@ -302,7 +302,9 @@ class Voice:
             import speech_recognition as sr
 
             self.recognizer = sr.Recognizer()
-            microphone = sr.Microphone()
+            from jarvis.audio import input_device_index
+
+            microphone = sr.Microphone(device_index=input_device_index())
             self._legacy_source = microphone.__enter__()  # keep it open for the whole session
             self.recognizer.adjust_for_ambient_noise(self._legacy_source, duration=CALIBRATE_SECONDS)
             self._apply_legacy_settings()

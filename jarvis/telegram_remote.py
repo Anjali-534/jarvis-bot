@@ -809,7 +809,7 @@ def serve(laptop_ctx, run_once=None, sleep=time.sleep, running=lambda ctx: getat
         except Exception as exc:
             name = type(exc).__name__
             if "InvalidToken" in name or "Unauthorized" in name or "Forbidden" in name:
-                log.error("[telegram] the bot token was rejected. Check TELEGRAM_BOT_TOKEN in .env "
+                log.error("[telegram] the bot token was rejected. Check the bot token in Settings, Connections "
                           "(get one from @BotFather). The phone remote is off.")
                 return "bad token"
             if time.monotonic() - started > 300:

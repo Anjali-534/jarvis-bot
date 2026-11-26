@@ -100,7 +100,7 @@ def test_nothing_available_gives_clear_error(groq, monkeypatch):
     ctx = make_ctx()
     handle(ctx, "tum kaise ho")
     assert ctx.voice.last == ("The AI model llama 3.3 70b versatile has been retired, and I couldn't find a replacement. "
-                              "Please set AI_MODEL in the .env file to a current model.")
+                              "Please pick a current model in Settings.")
     assert posts == ["llama-3.3-70b-versatile"]  # no pointless retry
     assert env_text() == ENV_TEXT.format(key=FAKE_KEY)  # .env untouched
 

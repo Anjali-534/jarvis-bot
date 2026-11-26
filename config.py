@@ -141,6 +141,7 @@ WAKE_WORDS = [w.strip().lower() for w in _str("WAKE_WORDS", "jarvis,hey jarvis,o
 FOLLOW_UP_SECONDS = _int("FOLLOW_UP_SECONDS", 20)
 
 SPEECH_LANGUAGE = _str("SPEECH_LANGUAGE", "en-IN")
+MIC_DEVICE = _str("MIC_DEVICE")  # part of the microphone's name (the setup wizard picks it); empty = Windows default
 VOICE_NAME = _str("VOICE_NAME", "david")   # pyttsx3 (Windows) voice: the offline fallback
 VOICE_RATE = _int("VOICE_RATE", 185)
 # edge = Microsoft's free neural voices via edge-tts (needs internet; falls back to pyttsx3); pyttsx3 = offline only

@@ -72,6 +72,7 @@ class TrayApp:
             item("Sleep", self.on_sleep),
             item(lambda _: "Unmute mic" if self.assistant and self.assistant.mic_muted else "Mute mic", self.on_mute),
             menu.SEPARATOR,
+            item("Settings", self.on_settings),
             item("Open COMMANDS.md", self.on_open_commands),
             item("Open notes", self.on_open_notes),
             item("Open logs", self.on_open_logs),
@@ -154,6 +155,22 @@ class TrayApp:
         config.LOG_DIR.mkdir(parents=True, exist_ok=True)
         open_path(config.LOG_DIR)
 
+    def on_settings(self, *_):
+        """Open the Settings window (its own process: Tk and the tray each want a main thread). Restart on save."""
+        def run():
+            from jarvis.gui.setup_window import SAVED
+
+            try:
+                code = subprocess.call(app_command("--settings"), cwd=str(config.BASE_DIR))
+            except OSError:
+                log.exception("[tray] couldn't open Settings")
+                return
+            if code == SAVED:
+                log.info("[tray] settings saved; restarting to apply them")
+                self.on_restart()
+
+        threading.Thread(target=run, name="settings-window", daemon=True).start()
+
     def on_restart(self, *_):
         self._restart = True
         self.on_quit()
@@ -186,11 +203,40 @@ class TrayApp:
             self.voice.close()
 
 
+def app_command(*args):
+    """How to start this program again with these arguments (the built Jarvis.exe, or Python + the launcher)."""
+    if config.FROZEN:
+        return [sys.executable, *args]
+    launcher = config.REPO_DIR / ("run_jarvis.pyw" if not args else "main.py")
+    return [sys.executable, str(launcher), *args]
+
+
 def relaunch():
     """Start a fresh copy of this program (used by Restart)."""
     flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     log.info("[tray] restarting: %s %s", sys.executable, sys.argv)
     subprocess.Popen([sys.executable, *sys.argv], cwd=str(config.BASE_DIR), creationflags=flags, close_fds=True)
+
+
+def first_run_setup(instance=None):
+    """No settings yet: show the setup wizard. True if it saved (and a fresh copy was started to use them)."""
+    from jarvis import setup_logic
+
+    if not setup_logic.needs_setup():
+        return False
+    try:
+        from jarvis.gui.setup_window import SAVED, run_wizard
+
+        code = run_wizard()
+    except Exception:
+        log.exception("[tray] the setup wizard failed; starting with default settings")
+        return False
+    if code != SAVED:
+        return False
+    if instance:
+        instance.release()
+    relaunch()
+    return True
 
 
 def main():
@@ -206,6 +252,8 @@ def main():
         reached = instance.signal_existing()
         log.info("[tray] already running (signalled: %s); exiting", reached)
         return 0
+    if first_run_setup(instance):
+        return 0  # the wizard saved settings and started a fresh copy that reads them
     log.info("[tray] %s starting in the tray", config.ASSISTANT_NAME)
     try:
         TrayApp(instance).run()

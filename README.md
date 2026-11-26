@@ -4,6 +4,21 @@ Jarvis is a voice assistant for a Windows laptop, written in Python 3.13. It sta
 
 Each feature lives in its own **skill file**, so new integrations (WhatsApp, VS Code and so on) can be added without touching the rest.
 
+## Setup wizard and Settings
+
+The first time Jarvis starts, a setup wizard opens. It has six short steps, and every one except your name and city can be skipped:
+
+1. **About you:** name, nickname, gender (for Hindi grammar; "prefer not to say" avoids gendered forms), city or pincode (checked on the map), and English or Hinglish.
+2. **Your assistant:** name (Jarvis by default), voice (play a sample of each Microsoft neural voice or the offline Windows voices), friend or professional, and the wake word on or off.
+3. **Microphone:** pick the device, watch the live level meter, and try "say hello" to see what speech recognition heard.
+4. **AI brain (optional):** Groq, Gemini or OpenAI, with "Get a free key" and "Test key" buttons, or skip it.
+5. **Optional connections:** Telegram bot token, WAQI token, Tavily key, each with a "Get one" button and a "Test" button. Under *Advanced*: Google (your own OAuth client JSON) and Spotify (your own client ID).
+6. **Start with Windows:** yes or no.
+
+**Settings** (tray menu > Settings, or `python main.py --settings`) has the same sections as tabs, plus **Open data folder** and **Reset everything** (asks first; deletes settings, memories, notes, sign-ins and keys). Saving restarts Jarvis so the new settings apply. `python main.py --setup` runs the wizard again.
+
+**Without any keys** Jarvis still does: time and date, apps, windows, files, Windows settings, volume, notes, reminders, timers, routines, memory, maths, weather and air quality (free Open-Meteo), and web search (free DuckDuckGo). Things that need the AI tell you to add a free key in Settings > AI brain.
+
 ## Where your data lives
 
 * **Installed app:** everything is in `%APPDATA%\Jarvis`: `settings.json`, memory, notes, contacts, routines, cache, logs and sign-in tokens.

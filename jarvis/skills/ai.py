@@ -63,10 +63,10 @@ def error_message(status, body=""):
     """A clear spoken message for an HTTP error from the AI service (in the current personality)."""
     body = (body or "").lower()
     if status in (401, 403) or (status == 400 and any(w in body for w in KEY_WORDS)):
-        return "My AI key was rejected. Please check AI_API_KEY in your .env file."
+        return "My AI key was rejected. Please check it in Settings, AI brain."
     if status == 404:
         return (f"The AI model {config.AI_MODEL} wasn't found. "
-                "Please check AI_MODEL and AI_BASE_URL in your .env file.")
+                "Please check the AI brain in Settings.")
     if status == 429:
         return persona.line("ai_busy")
     if status >= 500:
@@ -630,7 +630,7 @@ def _no_ai_key(ctx, command):
 
     answer = browse.look_up(ctx, command, question=command)
     if answer and persona.is_line("nothing_found", answer):
-        answer += " Add an AI_API_KEY to the .env file and I can answer anything."
+        answer += " Add a free AI key in Settings, AI brain, and I can answer anything."
     return answer
 
 
@@ -655,7 +655,7 @@ def ai(ctx, command, match=None):
             log.warning("[ai] HTTP %s: %s", status, chunks[:300])
             if is_retired(status, chunks):
                 return (f"The AI model {spoken_model()} has been retired, and I couldn't find a replacement. "
-                        "Please set AI_MODEL in the .env file to a current model.")
+                        "Please pick a current model in Settings.")
             return error_message(status, chunks)
         announce_switch(ctx)
         for sentence in sentences(chunks):

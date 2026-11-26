@@ -245,7 +245,7 @@ def test_a_bad_token_stops_cleanly(caplog):
 
     with caplog.at_level("ERROR"):
         assert tg.serve(make_ctx(), run_once=run_once, sleep=lambda s: None) == "bad token"
-    assert "TELEGRAM_BOT_TOKEN" in caplog.text
+    assert "bot token" in caplog.text and "Settings" in caplog.text
 
 
 def test_telegram_down_never_breaks_a_command(paired, monkeypatch):

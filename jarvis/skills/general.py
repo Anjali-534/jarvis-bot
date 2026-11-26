@@ -197,7 +197,7 @@ def ai_model(ctx, command, match):
     from jarvis.skills import ai
 
     if not config.AI_API_KEY:
-        return "No AI is set up yet. Add an AI_API_KEY to the .env file."
+        return "No AI is set up yet. Add a free key in Settings, AI brain."
     main = f"{ai.provider_name()}, with the model {ai.spoken_model()}"
     if not ai.has_backup():
         return f"I'm using {main}."

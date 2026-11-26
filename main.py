@@ -5,6 +5,9 @@
     python main.py --text     type instead of talking (wake word off)
     python main.py --mute     print replies instead of speaking them
     python main.py --timing   print how long each step of every turn took
+    python main.py --setup    the setup wizard (it also opens by itself the first time)
+    python main.py --settings the Settings window
+    python main.py --dev      developer mode: keep data in the repo's data/ folder
 
 To run in the background with a tray icon instead, use run_jarvis.pyw.
 """
@@ -45,8 +48,25 @@ def main(argv=None):
     parser.add_argument("--no-wake", action="store_true", help="don't require the wake word")
     parser.add_argument("--mute", action="store_true", help="print replies instead of speaking them")
     parser.add_argument("--timing", action="store_true", help="print per-turn latency (wake, STT, skill, TTS)")
+    parser.add_argument("--setup", action="store_true", help="open the setup wizard")
+    parser.add_argument("--settings", action="store_true", help="open the Settings window")
+    parser.add_argument("--dev", action="store_true", help="developer mode: data in the repo's data/ folder")
     args = parser.parse_args(argv)
     setup_logging(console=True)
+    if args.setup or args.settings:
+        from jarvis.gui.setup_window import run_settings, run_wizard
+
+        return run_wizard() if args.setup else run_settings()
+    from jarvis import setup_logic
+
+    if setup_logic.needs_setup() and not (args.text or args.mute):
+        import subprocess
+        import sys
+
+        from jarvis.gui.setup_window import SAVED, run_wizard
+
+        if run_wizard() == SAVED:  # start again, so the new settings are read
+            return subprocess.call([sys.executable, *sys.argv])
     if args.timing:
         from jarvis import timing
 

@@ -8,6 +8,7 @@
 | `python main.py --no-wake` | Voice mode without the wake word. Every phrase is a command. |
 | `python main.py --text` | Type commands instead of speaking. No wake word needed. |
 | `python main.py --mute` | Print replies instead of speaking them. Combine with the others, e.g. `--text --mute`. |
+| `python main.py --setup` / `--settings` | The setup wizard / the Settings window (also in the tray menu). |
 | `python main.py --timing` | Print how long each step of every turn took (wake word, speech, speech-to-text, skill, voice). |
 | `python -m jarvis.benchmark` | Compare Google and Whisper speech-to-text on your recorded samples. |
 

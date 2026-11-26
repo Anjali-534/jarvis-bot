@@ -37,3 +37,4 @@ winrt-Windows.Devices.Radios
 # Telegram phone remote (only used when TELEGRAM_BOT_TOKEN is set)
 python-telegram-bot>=21
 keyring
+customtkinter

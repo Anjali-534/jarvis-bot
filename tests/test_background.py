@@ -349,7 +349,7 @@ def test_tray_menu_and_status(fake_pystray, monkeypatch):
     monkeypatch.setattr(tray, "open_path", opened.append)
     app = tray.TrayApp()
     labels = [i.label() for i in app.menu.items if isinstance(i, FakeMenuItem)]
-    assert labels == ["Wake up", "Sleep", "Mute mic", "Open COMMANDS.md", "Open notes", "Open logs",
+    assert labels == ["Wake up", "Sleep", "Mute mic", "Settings", "Open COMMANDS.md", "Open notes", "Open logs",
                       f"Restart {config.ASSISTANT_NAME}", "Quit"]
     assert app.icon.title == f"{config.ASSISTANT_NAME}: Starting"
 

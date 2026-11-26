@@ -331,7 +331,7 @@ def connect_spotify(ctx, command, match):
     if not config.SPOTIFY_CLIENT_ID:
         log.info(setup_steps())
         return ("First you need a Spotify app. I've printed the steps in the terminal and the log, and they're in "
-                "the README. Put its client ID in the .env file as SPOTIFY_CLIENT_ID, restart me, "
+                "the README. Put its client ID in Settings, Connections, "
                 "and say connect spotify again.")
     ctx.say("I'm opening Spotify login in your browser. Log in and click Agree.")
     try:

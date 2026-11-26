@@ -426,7 +426,7 @@ def test_ai_without_key(monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "")
     ctx = make_ctx()
     assert handle(ctx, "turn off the lights") == "ai"
-    assert "AI_API_KEY" in ctx.voice.last
+    assert "Settings" in ctx.voice.last and "AI brain" in ctx.voice.last
 
 
 def test_ai_with_key_keeps_history(monkeypatch):
@@ -444,7 +444,7 @@ def test_ai_with_key_keeps_history(monkeypatch):
 
 
 @pytest.mark.parametrize("status, body, expected", [
-    (401, "Invalid API Key", "My AI key was rejected. Please check AI_API_KEY in your .env file."),
+    (401, "Invalid API Key", "My AI key was rejected. Please check it in Settings, AI brain."),
     (400, '{"error": {"message": "API key not valid. Please pass a valid API key."}}', "My AI key was rejected"),
     (403, "", "My AI key was rejected"),
     (404, "model not found", "The AI model test model has been retired, and I couldn't find a replacement."),

@@ -61,7 +61,7 @@ def test_connect_without_client_id_prints_steps(caplog):
     with caplog.at_level(logging.INFO):
         assert handle(ctx, "connect spotify") == "connect spotify"
     assert "developer.spotify.com/dashboard" in caplog.text and "http://127.0.0.1:8888/callback" in caplog.text
-    assert "SPOTIFY_CLIENT_ID" in ctx.voice.last
+    assert "Settings, Connections" in ctx.voice.last
 
 
 def test_connect_runs_pkce_flow(monkeypatch):

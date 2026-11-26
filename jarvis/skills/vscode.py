@@ -268,7 +268,7 @@ def open_file(ctx, command, match):
 def list_projects(ctx, command, match):
     projects = get_projects()
     if not projects:
-        return ("I didn't find any projects. Set PROJECT_ROOTS in the .env file, "
+        return ("I didn't find any projects. Set your project folders (PROJECT_ROOTS) in Settings, "
                 "or add aliases to data slash projects dot json.")
     names = sorted(projects)
     return speak_list(ctx, f"You have {len(names)} project{'s' if len(names) != 1 else ''}:", names)

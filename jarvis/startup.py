@@ -35,7 +35,11 @@ def pythonw_path(repo=None, executable=None):
 
 
 def shortcut_spec(repo=None, executable=None):
-    repo = Path(repo or config.BASE_DIR)
+    if getattr(config, "FROZEN", False) and repo is None:  # the installed Jarvis.exe starts itself in the tray
+        exe = Path(executable or sys.executable)
+        return {"path": shortcut_path(), "target": exe, "arguments": "", "working_dir": exe.parent,
+                "description": f"Start {config.ASSISTANT_NAME} voice assistant in the tray"}
+    repo = Path(repo or config.REPO_DIR)
     return {
         "path": shortcut_path(),
         "target": pythonw_path(repo, executable),

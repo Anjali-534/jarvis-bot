@@ -33,6 +33,43 @@ def rms(frame):
 
 
 # ---------------------------------------------------------------- microphone
+def input_devices(pa=None):
+    """[(index, name)] for every microphone Windows reports (MME devices, no duplicates)."""
+    import pyaudio
+
+    own = pa is None
+    pa = pa or pyaudio.PyAudio()
+    try:
+        seen, devices = set(), []
+        for i in range(pa.get_device_count()):
+            info = pa.get_device_info_by_index(i)
+            name = str(info.get("name", "")).strip()
+            if info.get("maxInputChannels", 0) > 0 and info.get("hostApi", 0) == 0 and name and name not in seen:
+                seen.add(name)
+                devices.append((i, name))
+        return devices
+    finally:
+        if own:
+            pa.terminate()
+
+
+def input_device_index(pa=None):
+    """The device chosen in Settings (MIC_DEVICE: part of its name), or None for the Windows default."""
+    import config
+
+    wanted = (getattr(config, "MIC_DEVICE", "") or "").strip().lower()
+    if not wanted:
+        return None
+    try:
+        for index, name in input_devices(pa):
+            if wanted in name.lower():
+                return index
+    except Exception:
+        log.debug("couldn't list microphones", exc_info=True)
+    log.warning("[audio] microphone %r not found; using the Windows default", wanted)
+    return None
+
+
 class MicStream:
     """A PyAudio input stream opened once. read() returns one 20 ms frame at 16 kHz."""
 
@@ -41,13 +78,17 @@ class MicStream:
 
         self._pa = pyaudio.PyAudio()
         self.native_rate = RATE
+        device = input_device_index(self._pa)
         try:
             self._stream = self._pa.open(format=pyaudio.paInt16, channels=1, rate=RATE, input=True,
-                                         frames_per_buffer=FRAME)
+                                         frames_per_buffer=FRAME, input_device_index=device)
         except OSError:  # some drivers refuse 16 kHz: record at the device rate and resample
-            self.native_rate = int(self._pa.get_default_input_device_info()["defaultSampleRate"])
+            info = (self._pa.get_device_info_by_index(device) if device is not None
+                    else self._pa.get_default_input_device_info())
+            self.native_rate = int(info["defaultSampleRate"])
             self._stream = self._pa.open(format=pyaudio.paInt16, channels=1, rate=self.native_rate, input=True,
-                                         frames_per_buffer=int(FRAME * self.native_rate / RATE))
+                                         frames_per_buffer=int(FRAME * self.native_rate / RATE),
+                                         input_device_index=device)
             log.info("[audio] microphone opened at %s Hz (resampling to 16 kHz)", self.native_rate)
         self._lock = threading.Lock()
 
