@@ -113,7 +113,7 @@ def test_shortlist_keeps_the_previous_turns_tool():
 
 def test_routed_question_stays_small(ai_router, friend):  # noqa: F811
     ai_router.append(tool_call("reply", text="Canberra hai, Sydney nahi!"))
-    handle(make_ctx(), "australia ki capital kaunsi hai")
+    handle(make_ctx(), "australia mein sabse famous jagah konsi hai")  # not a fact-check pattern
     body = ai_router.requests[0]["payload"]
     names = [t["function"]["name"] for t in body["tools"]]
     assert names == ["web_search", "reply"]
@@ -195,7 +195,7 @@ def test_timing_shows_input_tokens(ai_router, friend, monkeypatch):  # noqa: F81
     reply._data["usage"] = {"prompt_tokens": 812}
     ai_router.append(reply)
     turn = timing.begin()
-    handle(make_ctx(), "australia ki capital kaunsi hai")
+    handle(make_ctx(), "australia mein sabse famous jagah konsi hai")
     assert turn.tokens["routing"] == (812, False)
     monkeypatch.setattr(http, "post_stream", lambda *a, **k: openai_stream("Theek hai."))
     handle(make_ctx(), "tu kya sochta hai")

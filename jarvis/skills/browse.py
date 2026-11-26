@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote_plus, urlparse
 
 import config
-from jarvis import cache, http, persona, timing
+from jarvis import cache, grammar, http, persona, timing
 from jarvis.router import on_startup, skill
 
 log = logging.getLogger(__name__)
@@ -468,7 +468,7 @@ class _NeedPages(Exception):
     """The search results alone didn't answer it: read the pages and ask again."""
 
 
-def _stream_answer(ctx, question, found, detail, earlier, pages_can_help):
+def _stream_answer(ctx, question, found, detail, earlier, pages_can_help, hold_no_answer=False):
     """Speak the AI's answer sentence by sentence. Returns (spoken sentences, error to say or None)."""
     from jarvis.skills import ai
 
@@ -482,7 +482,7 @@ def _stream_answer(ctx, question, found, detail, earlier, pages_can_help):
             return spoken, ai.error_message(status, chunks)
         ai.announce_switch(ctx)
         for sentence in ai.sentences(chunks):
-            text = ai.strip_markdown(sentence)
+            text = grammar.fix(ai.strip_markdown(sentence))
             if not text:
                 continue
             if not spoken:
@@ -492,6 +492,8 @@ def _stream_answer(ctx, question, found, detail, earlier, pages_can_help):
                     if close:
                         close()
                     raise _NeedPages()
+                if hold_no_answer and _no_answer(text):
+                    return spoken, None  # the caller says its own "not sure" line instead
                 timing.mark("answer")
             if getattr(ctx.voice, "_hushed", False):
                 break  # barge-in
@@ -508,7 +510,7 @@ def _stream_answer(ctx, question, found, detail, earlier, pages_can_help):
     return spoken, None
 
 
-def speak_answer(ctx, question, found, detail=False, earlier=None):
+def speak_answer(ctx, question, found, detail=False, earlier=None, hold_no_answer=False):
     """Stream the AI's answer, sentence by sentence: from the search results first, and from the pages themselves
     if those didn't answer it (or for "tell me more"). Returns what's left for the router to say."""
     if detail:
@@ -518,12 +520,14 @@ def speak_answer(ctx, question, found, detail=False, earlier=None):
         first = found.get("summary") or found["sources"][0]["text"]
         return "Here's what I found online. " + " ".join(re.split(r"(?<=[.!?])\s+", first.strip())[:2])
     try:
-        spoken, error = _stream_answer(ctx, question, found, detail, earlier, pages_can_help=not found.get("deep"))
+        spoken, error = _stream_answer(ctx, question, found, detail, earlier, pages_can_help=not found.get("deep"),
+                                       hold_no_answer=hold_no_answer)
     except _NeedPages:
         log.info("[browse] the search results didn't answer it; reading the pages")
         found = deepen(found)
         ctx.state["last_search"]["found"] = found
-        spoken, error = _stream_answer(ctx, question, found, detail, earlier, pages_can_help=False)
+        spoken, error = _stream_answer(ctx, question, found, detail, earlier, pages_can_help=False,
+                                       hold_no_answer=hold_no_answer)
     if error:
         return error
     wait = getattr(ctx.voice, "wait_idle", None)

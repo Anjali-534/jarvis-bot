@@ -526,7 +526,9 @@ def _answer(ctx, command, text):
     from jarvis import router
     from jarvis.skills import ai
 
-    reply = ai.strip_markdown(text)
+    from jarvis import grammar
+
+    reply = grammar.fix(ai.strip_markdown(text))
     if not reply:
         return None
     ai.announce_switch(ctx)

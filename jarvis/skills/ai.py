@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import config
-from jarvis import http, persona
+from jarvis import grammar, http, persona
 from jarvis.router import fallback, on_startup, skill
 
 log = logging.getLogger(__name__)
@@ -651,7 +651,7 @@ def ai(ctx, command, match=None):
             return error_message(status, chunks)
         announce_switch(ctx)
         for sentence in sentences(chunks):
-            text = strip_markdown(sentence)
+            text = grammar.fix(strip_markdown(sentence))  # "tu kaisi hai", "main kar dunga"
             if not text:
                 continue
             if getattr(ctx.voice, "_hushed", False):

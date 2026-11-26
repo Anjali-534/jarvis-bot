@@ -187,6 +187,11 @@ PHRASES = {
         PROFESSIONAL: ["Checking online."],
         FRIEND: ["Ruk, online dekh{ta} hoon", "Ek sec, internet pe check kar{ta} hoon", "Dekh{ta} hoon online"],
     },
+    "not_sure": {  # a factual question the web couldn't confirm: never guess
+        PROFESSIONAL: ["I'm not sure, and I couldn't confirm it online. Shall I open a Google search?"],
+        FRIEND: ["Pakka nahi hoon yaar, online bhi confirm nahi mila. Google pe dekh lein?",
+                 "Sach bolun toh pakka nahi hoon, aur online bhi clear nahi mila. Google pe khol doon?"],
+    },
     "nothing_found": {
         PROFESSIONAL: ["I couldn't find anything online about that right now. Please try again in a bit."],
         FRIEND: ["Yaar, online kuch mila nahi abhi. Thodi der mein try karein?",

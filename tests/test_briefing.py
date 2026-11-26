@@ -83,21 +83,29 @@ def test_failing_and_unconnected_sections_are_skipped_silently(monkeypatch):
 
 
 def test_sections_run_in_parallel_with_a_timeout(monkeypatch):
+    import threading
+
+    together = threading.Barrier(3, timeout=5)  # the quick ones only get past it if they run at the same time
+    stuck = threading.Event()
+
     def slow(ctx):
-        time.sleep(1.0)
+        stuck.wait(10)
         return S("Too late to be included.")
 
     def quick(ctx):
-        time.sleep(0.2)
+        together.wait()
         return S("Quick section here.")
 
     fake_sections(monkeypatch)
     jobs = {"a": quick, "b": quick, "c": quick, "slow": slow}
     started = time.monotonic()
-    found = briefing.gather(make_ctx(), jobs, timeout=0.5)
+    try:
+        found = briefing.gather(make_ctx(), jobs, timeout=2.0)
+    finally:
+        stuck.set()
     elapsed = time.monotonic() - started
-    assert set(found) == {"a", "b", "c"}  # the slow one was dropped
-    assert elapsed < 0.9                   # parallel: not 3 x 0.2 + 1.0
+    assert set(found) == {"a", "b", "c"}  # all three met at the barrier (parallel), the slow one was dropped
+    assert elapsed < 5.0                   # cut off at the 2 s timeout, not the slow section's 10 s
 
 
 def test_default_timeout_is_six_seconds():

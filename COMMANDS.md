@@ -222,6 +222,7 @@ Jarvis talks like a close friend by default (casual Hinglish: "Ho gaya!", "Kya b
 ## General questions
 - "What is 25 times 4" / "what is 10 percent of 250" / "what is the square root of 144"
 - "Who is Sachin Tendulkar" / "tell me about the Taj Mahal"
+- Facts are checked online before Jarvis answers: "who wrote Godaan" / "godaan kisne likha", "capital of Australia" / "australia ki rajdhani kya hai", "when was the Taj Mahal built" / "taj mahal kab bana", "how many states are there in India". The answer comes only from what the search found. If it can't confirm one, it says "Pakka nahi hoon yaar" and offers Google instead of guessing.
 - "Tell me a joke" / "who are you" / "how are you" / "thank you"
 - Anything else goes to the AI, which answers like a friend: "tu kaisa hai", "mujhe neend nahi aa rahi", "explain recursion simply", "tu kya sochta hai, mujhe MBA karna chahiye?", "kaunsa better hai iPhone ya Pixel"
 - Follow-ups: "aur?", "kyun?", "uska kya?", "explain karo" / "detail mein bata" (a longer answer)

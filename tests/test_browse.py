@@ -391,44 +391,59 @@ def test_results_are_cached_for_30_minutes(web, monkeypatch):
     assert web["searches"] == ["latest iphone", "latest iphone"]
 
 
-def test_slow_search_gives_up_within_the_budget(web, monkeypatch):
+@pytest.fixture
+def stuck():
+    """An event slow fakes wait on (up to 10 s) instead of sleeping: only a deadline can get past them, so
+    timing asserts get a wide margin and never depend on how fast the machine is. Released at teardown."""
+    import threading
+
+    event = threading.Event()
+    yield event
+    event.set()
+
+
+def test_slow_search_gives_up_within_the_budget(web, monkeypatch, stuck):
     monkeypatch.setattr(config, "SEARCH_BUDGET", 0.3)
-    monkeypatch.setattr(browse, "ddgs_text", lambda q: time.sleep(3) or HITS)
+    monkeypatch.setattr(browse, "ddgs_text", lambda q: stuck.wait(10) and HITS)
     ctx = make_ctx()
     started = time.monotonic()
     handle(ctx, "search the web for latest iphone")
-    assert time.monotonic() - started < 1.5
+    assert time.monotonic() - started < 5.0  # the budget is 0.3 s; a broken one would take 10 s
     assert ctx.voice.last == browse.NOTHING_FOUND
 
 
-def test_slow_pages_fall_back_to_snippets(web, monkeypatch):
-    monkeypatch.setattr(browse, "PAGE_TIMEOUT", 0.2)
+def test_slow_pages_fall_back_to_snippets(web, monkeypatch, stuck):
+    monkeypatch.setattr(browse, "PAGE_TIMEOUT", 0.5)
 
     def slow_download(url, timeout=4):
         if "goodreturns" in url:
-            time.sleep(2)
+            stuck.wait(10)
+            return None
         return web["pages"].get(url)
 
     monkeypatch.setattr(browse, "download", slow_download)
     found = browse.search("petrol price in delhi today")
     started = time.monotonic()
     found = browse.deepen(found)
-    assert time.monotonic() - started < 1.5
+    assert time.monotonic() - started < 5.0
     goodreturns = next(s for s in found["sources"] if "goodreturns" in s["url"])
     assert goodreturns["text"] == "Rs 94.77 today"  # the search snippet, since the page was too slow
     assert found["sources"][0]["url"] == HITS[3]["href"]  # the page that did arrive comes first
 
 
-def test_pages_cut_off_at_the_deadline_still_give_an_answer(web, monkeypatch):
+def test_pages_cut_off_at_the_deadline_still_give_an_answer(web, monkeypatch, stuck):
     """Pages still loading at the deadline are dropped, but the snippets are kept."""
-    monkeypatch.setattr(config, "SEARCH_BUDGET", 0.6)
-    monkeypatch.setattr(browse, "ddgs_text", lambda q: time.sleep(0.4) or [dict(h) for h in HITS])
-    monkeypatch.setattr(browse, "download", lambda url, timeout=4: time.sleep(2) or PETROL_PAGE)
+    # No real sleeps racing a real clock: the page download blocks until the test ends, so the ONLY way
+    # deepen() can return is its deadline. If the deadline were broken it would take 10 s, far past the margin.
+    monkeypatch.setattr(browse, "ddgs_text", lambda q: [dict(h) for h in HITS])
+    monkeypatch.setattr(browse, "download", lambda url, timeout=4: stuck.wait(10) and PETROL_PAGE)
     found = browse.search("petrol price in delhi today")
+    assert found
     started = time.monotonic()
-    found = browse.deepen(found)
-    assert time.monotonic() - started < 1.0
-    assert found and found["sources"][0]["text"] == "Rs 94.77 today"
+    found = browse.deepen(found, budget=0.3)
+    elapsed = time.monotonic() - started
+    assert elapsed < 5.0  # 0.3 s deadline; the wide margin tolerates a slow or busy machine
+    assert found and found["sources"][0]["text"] == "Rs 94.77 today"  # the snippet was kept
 
 
 def test_within_times_out():
@@ -532,7 +547,7 @@ def test_current_role_questions_skip_wikipedia(routing):
 
 
 # ---------------------------------------------------------------- ddgs engines asked in parallel
-def test_ddgs_engines_race_and_first_real_answer_wins(monkeypatch):
+def test_ddgs_engines_race_and_first_real_answer_wins(monkeypatch, stuck):
     monkeypatch.setattr(browse, "DDGS_BACKENDS", ("dead", "slow", "good"))
     hit = [{"title": "t", "href": "https://x.com", "body": "b"}]
 
@@ -540,13 +555,13 @@ def test_ddgs_engines_race_and_first_real_answer_wins(monkeypatch):
         if name == "dead":
             raise RuntimeError("No results found.")
         if name == "slow":
-            time.sleep(5)
+            stuck.wait(10)
         return hit
 
     monkeypatch.setattr(browse, "ddgs_backend", backend)
     started = time.monotonic()
     assert REAL_DDGS_TEXT("q") == hit
-    assert time.monotonic() - started < 1  # neither the failure nor the slow engine held it up
+    assert time.monotonic() - started < 5.0  # neither the failure nor the slow (10 s) engine held it up
 
 
 def test_ddgs_every_engine_failing_raises(monkeypatch):

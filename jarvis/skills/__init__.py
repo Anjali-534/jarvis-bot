@@ -17,6 +17,9 @@ Laptop control:
 * keyboard_control comes before files ("find on this page" is Ctrl+F); windows before files ("move this to
   the other screen"); files before apps ("open my resume"); app_index before apps ("close all apps").
 
+facts (who wrote / capital of / when was / how many: checked on the web, never answered from memory) comes before
+web_questions, Wikipedia and the AI.
+
 To add an integration, create jarvis/skills/<name>.py with @skill handlers and add it to this list before
 "knowledge" and "ai".
 """
@@ -24,14 +27,14 @@ To add an integration, create jarvis/skills/<name>.py with @skill handlers and a
 ORDER = [
     "general", "notes", "history", "media_session", "whatsapp", "gmail", "calendar", "settings_control", "spotify",
     "browse", "routines", "keyboard_control", "windows", "files", "system", "web", "vscode", "app_index", "apps",
-    "weather", "aqi", "web_questions", "knowledge", "ai",
+    "weather", "aqi", "facts", "web_questions", "knowledge", "ai",
     "briefing",  # last: "good morning" falls through from the plain greeting
 ]
 
 from jarvis.skills import (  # noqa: E402,F401
     general, notes, history, media_session, gmail, calendar, settings_control, spotify, browse, routines,
-    keyboard_control, windows, files, system, web, whatsapp, vscode, app_index, apps, weather, aqi, web_questions,
-    knowledge, ai, briefing,
+    keyboard_control, windows, files, system, web, whatsapp, vscode, app_index, apps, weather, aqi, facts,
+    web_questions, knowledge, ai, briefing,
 )
 
 

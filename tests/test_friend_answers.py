@@ -110,10 +110,10 @@ def test_never_a_dead_end_without_an_ai_key(friend, monkeypatch):
     monkeypatch.setattr(config, "AI_API_KEY", "")
     looked_up = []
     monkeypatch.setattr(browse, "look_up", lambda ctx, query, question=None, earlier=None:
-                        looked_up.append(query) or "Here's what I found online. Canberra.")
+                        looked_up.append(query) or "Here's what I found online. Sydney Opera House.")
     ctx = make_ctx()
-    handle(ctx, "capital of australia kya hai")
-    assert looked_up == ["capital of australia kya hai"] and "Canberra" in ctx.voice.last
+    handle(ctx, "australia mein sabse famous jagah konsi hai")  # facts (capital of...) has its own test
+    assert looked_up == ["australia mein sabse famous jagah konsi hai"] and "Opera" in ctx.voice.last
 
 
 def test_ai_down_still_answers_like_a_friend(backends, friend, monkeypatch):  # noqa: F811
